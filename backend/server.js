@@ -74,10 +74,11 @@ app.use(cors({ origin: true, credentials: true }));   // Autorise les requêtes 
 app.use(express.json());                                // Parse le JSON dans les requêtes
 
 // --- Serveur de fichiers statiques (Frontend) ---
-// En Docker : le dossier frontend est monté dans /app/frontend
-// En local : le dossier frontend est à ../frontend (un niveau au-dessus du backend)
-const frontendPath = path.join(__dirname, '..', 'frontend');
+// En Docker : le dossier frontend est monté via FRONTEND_PATH (ex: /app/frontend)
+// En local : le dossier frontend est à ../frontend par rapport à ce fichier
+const frontendPath = process.env.FRONTEND_PATH || path.join(__dirname, '..', 'frontend');
 app.use(express.static(frontendPath));
+console.log(`📂 Service du frontend depuis : ${frontendPath}`);
 
 // --- Routes API ---
 app.use("/api", apiRoutes);

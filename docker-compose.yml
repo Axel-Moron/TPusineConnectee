@@ -6,19 +6,41 @@
 version: '3.8'
 
 services:
-  # --- Service principal : Backend Node.js + Frontend statique ---
+  # --- Base de données MariaDB ---
+  db:
+    image: mariadb:10.6
+    container_name: tp2-db
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: tp2_maintenance_z4
+    volumes:
+      - db_data:/var/lib/mysql
+    ports:
+      - "3307:3306"             # Ouvert sur 3307 pour ne pas entrer en conflit avec un MariaDB local
+
+  # --- Application principal : Backend Node.js + Frontend statique ---
   app:
     build: ./backend
-    container_name: tp2-maintenance-connectee
+    container_name: tp2-app
+    restart: unless-stopped
+    depends_on:
+      - db
     ports:
       - "3000:3000"            # Port d'accès à l'application web
     env_file: .env
+    environment:
+      - DB_HOST=db             # Utilise le service 'db' interne au réseau Docker
+      - DB_USER=root
+      - DB_PASSWORD=root
+      - FRONTEND_PATH=/app/frontend
+      # (Optionnel) Désactive le mode simulation par défaut si souhaité
+      - NODE_ENV=production
     extra_hosts:
-      - "host.docker.internal:host-gateway"   # Permet d'accéder au MariaDB du PC hôte
+      - "host.docker.internal:host-gateway"   # Permet d'accéder au MariaDB du PC hôte si besoin
     volumes:
       - ./frontend:/app/frontend               # Montage du frontend
       - ./csv:/app/csv                         # Montage du dossier CSV pour traçabilité
-    restart: unless-stopped
 
 volumes:
-  csv_data:
+  db_data:
