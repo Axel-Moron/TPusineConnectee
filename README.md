@@ -48,28 +48,36 @@ Ce projet met en œuvre une carte de contrôle liée à un capteur de températu
 
 ## 🚀 Installation & Lancement Rapide
 
-1. **Prérequis** :
-   - Disposer d'une base de données MariaDB (WAMP/XAMPP ou Docker).
-   - Avoir Node.js installé.
-   - Le PC doit être connecté au **réseau WiFi de l'API**.
+Vous avez **deux méthodes** pour lancer le projet : avec Docker (recommandé et très simple) ou classiquement sur Windows.
 
-2. **Configuration** :
-   Copiez le fichier de configuration :
-   ```bash
-   cp .env.example .env
-   ```
-   Répétez vos identifiants SQL si nécessaire (par défaut : `root` sans mot de passe, DB `tp2_maintenance_z4`).
+### Méthode 1 : Lancement Automatique avec Docker (Recommandé)
+C'est la méthode idéale si vous ne voulez rien installer à part Docker. La base de données MariaDB est gérée de manière invisible.
+
+1. **Prérequis** : Avoir installé et démarré **Docker Desktop** sur votre machine.
+2. Assurez-vous d'être connecté au **réseau WiFi de l'API** (pour que le logiciel puisse joindre l'automate sur `172.16.1.24`).
+3. Double-cliquez simplement sur le fichier fourni :
+   ▶️ **`LANCER_DOCKER.bat`**
+4. Ouvrez votre navigateur sur : [http://localhost:3000](http://localhost:3000)
+
+*(Détail caché : La base de données interne tourne sur le port 3307 au cas où vous auriez déjà une BDD locale sur le port 3306. Si vous utilisez un terminal Linux/Mac : `docker-compose up --build -d`).*
+
+### Méthode 2 : Lancement Classique (Sans Docker)
+Utile si vous préférez utiliser un MariaDB local (ex: XAMPP) et Node.js directement sur Windows :
+
+1. **Prérequis** :
+   - Disposer d'une base MariaDB locale active (port 3306).
+   - Avoir **Node.js** installé.
+   - Être connecté au **réseau WiFi de l'API**.
+
+2. **Configuration BDD** :
+   Modifiez si besoin le fichier `.env` à la racine (par défaut : BDD `tp2_maintenance_z4`, utilisateur `root`, pas de mot de passe).
 
 3. **Démarrage** :
-   - Installez les dépendances : `npm install`
-   - Démarrez l'application :
-   ```bash
-   LANCER.bat
-   ```
-   *(Ou manuellement : `node backend/server.js`)*
+   Double-cliquez sur le fichier :
+   ▶️ **`LANCER.bat`**
+   *(Ou tapez dans un terminal : `cd backend && npm install && npm start`).*
 
-4. **Accès** :
-   - Dashboard de supervision : [http://localhost:3000](http://localhost:3000)
+4. **Accès** : [http://localhost:3000](http://localhost:3000)
 
 ---
 
@@ -78,12 +86,12 @@ Ce projet met en œuvre une carte de contrôle liée à un capteur de températu
 | Description | Type Modbus | Adresse | Remarque |
 |---|---|---|---|
 | **IP de l'automate** | Réseau TCP | `172.16.1.24` | Port 502 |
-| **Température** | Holding Register | `%MF706` | Décodage Little Endian Word Swap |
-| **Cycle Auto Zone 3** | Coil / Bit | `%M640` | `0` = Vrai / Lancé, `1` = Arrêté |
-| **Voyant Rouge** | Coil / Bit | `%M702` | |
-| **Voyant Orange** | Coil / Bit | `%M701` | |
-| **Voyant Vert** | Coil / Bit | `%M703` | |
-| **Heartbeat (optionnel)**| Holding Register | `%MW700` | Signale à l'API que la supervision est active à 1Hz |
+| **Température** | Holding Register | `%MW706` | Décodage Little Endian Word Swap (%MF706) |
+| **Cycle Auto Zone 3** | Holding Register | `%MW704` | `0` = Arrêté, non nul / positif = Lancé |
+| **Voyant Rouge** | Coil / Bit | `%M702` | Clignote si alarme très haute, fixe si alarme haute |
+| **Voyant Orange** | Coil / Bit | `%M701` | Fixe si plage normale |
+| **Voyant Vert** | Coil / Bit | `%M703` | Clignote si alarme très basse, fixe si alarme basse |
+| **Heartbeat (optionnel)**| Coil / Bit | `%M700` | Bascule à 1Hz pour signaler à l'API que la supervision est active |
 
 ---
 
