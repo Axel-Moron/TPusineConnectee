@@ -111,6 +111,68 @@ export const calculerPrediction = (temperature, seuils, cycleAutoActif) => {
         };
     }
 
+    // --- Seuil très haut déjà dépassé ---
+    if (temperature > seuils.tres_haut) {
+        if (pente > 0.001) {
+            return {
+                message: `⚠️ Seuil très haut dépassé - Température en hausse`,
+                tempsEstime: null,
+                direction: "monte",
+                actif: true,
+                pente: pente
+            };
+        } else if (pente < -0.001) {
+            const delta = temperature - seuils.tres_haut;
+            const tempsSecondes = Math.round(delta / Math.abs(pente));
+            return {
+                message: `Retour sous seuil très haut dans ${formatTemps(tempsSecondes)}`,
+                tempsEstime: tempsSecondes,
+                direction: "descend",
+                actif: true,
+                pente: pente
+            };
+        } else {
+            return {
+                message: `⚠️ Seuil très haut dépassé - Température stable`,
+                tempsEstime: null,
+                direction: "stable",
+                actif: true,
+                pente: pente
+            };
+        }
+    }
+
+    // --- Seuil très bas déjà dépassé ---
+    if (temperature < seuils.tres_bas) {
+        if (pente < -0.001) {
+            return {
+                message: `⚠️ Seuil très bas dépassé - Température en baisse`,
+                tempsEstime: null,
+                direction: "descend",
+                actif: true,
+                pente: pente
+            };
+        } else if (pente > 0.001) {
+            const delta = seuils.tres_bas - temperature;
+            const tempsSecondes = Math.round(delta / pente);
+            return {
+                message: `Retour au-dessus du seuil très bas dans ${formatTemps(tempsSecondes)}`,
+                tempsEstime: tempsSecondes,
+                direction: "monte",
+                actif: true,
+                pente: pente
+            };
+        } else {
+            return {
+                message: `⚠️ Seuil très bas dépassé - Température stable`,
+                tempsEstime: null,
+                direction: "stable",
+                actif: true,
+                pente: pente
+            };
+        }
+    }
+
     // --- Zone entre seuil haut et seuil très haut ---
     if (temperature > seuils.haut && temperature <= seuils.tres_haut) {
         if (pente > 0.001) {

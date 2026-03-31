@@ -740,9 +740,12 @@
                 if (prediction.direction === 'monte') {
                     icon.innerHTML = '&#8593;';  // Flèche haut
                     icon.style.color = '#ff6b6b';
-                } else {
+                } else if (prediction.direction === 'descend') {
                     icon.innerHTML = '&#8595;';  // Flèche bas
                     icon.style.color = '#51cf66';
+                } else {
+                    icon.innerHTML = '&#9888;';  // Triangle alerte
+                    icon.style.color = '#ff6b6b';
                 }
                 msg.style.color = '#ffd43b';
             } else {

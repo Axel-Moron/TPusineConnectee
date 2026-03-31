@@ -17,7 +17,7 @@
 import 'dotenv/config';
 import express from "express";
 import cors from "cors";
-import * as mariadb from "mariadb";
+import mysql2 from "mysql2/promise";
 import sequelize from "./config/db.js";
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -48,13 +48,11 @@ async function autoConfigDB() {
     let conn;
     try {
         // Connexion directe à MariaDB (sans préciser de base de données)
-        conn = await mariadb.createConnection({
+        conn = await mysql2.createConnection({
             host: process.env.DB_HOST || "127.0.0.1",
             port: parseInt(process.env.DB_PORT) || 3306,
             user: process.env.DB_USER || "root",
-            password: process.env.DB_PASSWORD || "",
-            allowPublicKeyRetrieval: true,
-            restrictedAuth: 'mysql_native_password,client_ed25519,caching_sha2_password'
+            password: process.env.DB_PASSWORD || ""
         });
 
         // Création de la base de données si elle n'existe pas
