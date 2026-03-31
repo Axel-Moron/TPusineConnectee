@@ -266,21 +266,23 @@ router.get("/config", (req, res) => {
 // =============================================================================
 // POST /api/config - Modifier la configuration Modbus et/ou la fréquence
 // Corps attendu (tous optionnels) :
-//   { modbusIp, modbusPort, passerelleIp, registreTemperature,
-//     diviseurTemperature, registreCycleAuto, frequenceLecture }
+//   { modbusIp, modbusPort, registreTemperature,
+//     registreCycleAuto, frequenceLecture, heartbeatEnabled, registreHeartbeat, heartbeatFreq }
 // =============================================================================
 router.post("/config", (req, res) => {
     try {
         const {
-            modbusIp, modbusPort, passerelleIp,
-            registreTemperature, diviseurTemperature, registreCycleAuto,
-            frequenceLecture
+            modbusIp, modbusPort,
+            registreTemperature, registreCycleAuto,
+            frequenceLecture,
+            heartbeatEnabled, registreHeartbeat, heartbeatFreq
         } = req.body;
 
         // Mise à jour de la config Modbus
         setModbusConfig({
-            modbusIp, modbusPort, passerelleIp,
-            registreTemperature, diviseurTemperature, registreCycleAuto
+            modbusIp, modbusPort,
+            registreTemperature, registreCycleAuto,
+            heartbeatEnabled, registreHeartbeat, heartbeatFreq
         });
 
         // Mise à jour de la fréquence si fournie

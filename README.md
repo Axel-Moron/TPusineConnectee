@@ -1,220 +1,105 @@
-# 🏭 TP2 — Maintenance Connectée — Zone 3
+# 🏭 TP2 - Maintenance Connectée - Zone 3
+**Projet de supervision industrielle pour la Mini-Usine (Zone 3)**
 
-> **UniLaSalle Amiens — I5PAUC 2025/2026**
-> **Groupe Z4 : MORON Axel & RAHARINJATOVO Lucien**
-
-Application web de **supervision de température en temps réel** pour la Zone 3 de la mini-usine connectée. Elle communique avec un automate **Schneider M580** via **Modbus TCP** et historise les données dans une base **MariaDB**.
-
----
-
-## 📋 Sommaire
-
-- [Fonctionnalités](#-fonctionnalités)
-- [Architecture](#-architecture)
-- [Technologies](#-technologies)
-- [Prérequis](#-prérequis)
-- [Installation](#-installation)
-- [Lancement](#-lancement)
-- [Utilisation avec Docker](#-utilisation-avec-docker)
-- [Configuration](#-configuration)
-- [Structure du projet](#-structure-du-projet)
+**Auteurs :** MORON Axel & RAHARINJATOVO Lucien (Groupe Z4)
+**Client :** M. Olivier BOUZY (UniLaSalle Amiens)
 
 ---
 
-## ✨ Fonctionnalités
+## 📋 Contexte & Objectifs du Cahier des Charges
 
-- 📡 **Lecture Modbus TCP** — Acquisition automatique de la température depuis le capteur Banner (via l'API M580)
-- 📊 **Dashboard temps réel** — Affichage de la température avec jauge visuelle et courbe Chart.js
-- ⚙️ **Seuils réglables** — 4 niveaux configurables (Très Bas, Bas, Haut, Très Haut)
-- 🚨 **Gestion d'alarmes** — Colonne lumineuse virtuelle (vert / orange / rouge, fixe ou clignotant)
-- 🔮 **Maintenance prédictive** — Estimation du temps avant dépassement de seuil (calcul de pente)
-- 🔄 **Cycle automatique** — Lecture de l'état du cycle auto Zone 3 depuis l'automate
-- 📁 **Export CSV** — Traçabilité des mesures et des alarmes
-- 📈 **Historique** — Consultation des mesures et des seuils passés avec graphique
-- 🌗 **Mode jour / nuit** — Interface avec thème clair et sombre
-- 🎮 **Mode simulation** — Test de l'application sans connexion à l'automate
-- 💡 **Recopie colonne lumineuse** — Écriture des voyants vers la colonne physique de l'armoire API (via coils Modbus)
+Ce projet met en œuvre une carte de contrôle liée à un capteur de température sans fil (Banner QM42VT1 + passerelle DX80N2Q45VT) pour détecter un échauffement anormal dans la Zone 3 de la Mini-Usine.
 
----
-
-## 🏗️ Architecture
-
-```
-┌─────────────────┐     HTTP      ┌───────────────────────┐    Modbus TCP    ┌──────────────┐
-│   Navigateur    │◄────────────►│   Backend Node.js     │◄──────────────►│  API M580     │
-│   (HTML/CSS/JS) │               │   (Express + API)     │                  │  172.16.1.23  │
-└─────────────────┘               └───────────┬───────────┘                  └──────┬───────┘
-                                              │                                     │
-                                              │ Sequelize ORM                       │ Modbus DTM
-                                              ▼                                     ▼
-                                     ┌─────────────────┐                   ┌────────────────┐
-                                     │    MariaDB       │                   │ Passerelle     │
-                                     │ (PC hôte)       │                   │ Banner         │
-                                     └─────────────────┘                   │ 172.16.1.65    │
-                                                                           └────────────────┘
-```
+### Fonctionnalités complètes réalisées selon le cahier des charges :
+1. **Lecture Modbus TCP** : Récupération des données depuis l'automate M580 (IP `172.16.1.24`).
+   - Température sur `%MF706` (Lecture Float 32 bits, 2 registres).
+   - "Cycle auto Zone 3 lancé" sur `%M640` (**Logique inversée : `0` = LANCÉ** selon l'énoncé).
+2. **Historisation (Base de données locale MariaDB + CSV)** :
+   - Historisation des températures et état du cycle (`Mesures`).
+   - Historisation des changements de seuils dans la BDD et dans `seuils.csv`.
+   - Historisation des déclenchements d'alarmes dans la BDD et dans `alarmes.csv`.
+3. **Interface Web temps réel** :
+   - Visualisation de l'état du cycle auto.
+   - Courbe dynamique de la température (Highcharts/Chart.js) et affichage numérique.
+   - Configuration dynamique des 4 seuils de détection (Très Haut, Haut, Bas, Très Bas).
+4. **Maintenance Conditionnelle & Alarmes Process** :
+   - Alarme **Niveau critique** : `> Seuil très haut` ➔ Voyant rouge clignotant (`%M702`).
+   - Alarme **Attention** : `> Seuil haut` ➔ Voyant rouge fixe (`%M702`).
+   - Alarme **Attention** : `< Seuil bas` ➔ Voyant vert fixe (`%M703`).
+   - Alarme **Niveau critique** : `< Seuil très bas` ➔ Voyant vert clignotant (`%M703`).
+   - **Plage normale** : Entre Bas et Haut ➔ Aucun message, voyant orange fixe (`%M701`).
+5. **Indicateurs de Maintenance Prédictive** :
+   Calcul en direct de la pente (régression linéaire) pour générer des messages d'alerte anticipés lorsque le cycle auto est lancé :
+   - Risque d'atteinte du seuil (très haut ou très bas) dans X secondes.
+   - Sortie du seuil (haut ou bas) dans X secondes.
+6. **Fichier PowerBI** :
+   Liaison PowerBI configurée sur la base de données `tp2_maintenance_z4` (fichier `.pbix` fourni séparément).
 
 ---
 
-## 🛠️ Technologies
+## 🛠️ Architecture Technique
 
-| Composant   | Technologie                     |
-|------------|----------------------------------|
-| Backend    | Node.js 18+, Express, Sequelize |
-| Frontend   | HTML5, CSS3, JavaScript, Chart.js |
-| BDD        | MariaDB                         |
-| Protocole  | Modbus TCP (modbus-serial)       |
-| Conteneur  | Docker & Docker Compose          |
-| Automate   | Schneider Modicon M580           |
+- **Backend** : Node.js avec le framework Express.
+- **Protocole Industriel** : `modbus-serial` (Modbus TCP).
+- **Frontend** : HTML5, CSS3, JavaScript Vanilla + API REST.
+- **Base de données** : MariaDB (gérée par `Sequelize` ORM).
 
 ---
 
-## 📦 Prérequis
+## 🚀 Installation & Lancement Rapide
 
-- **Node.js** 18+ ([nodejs.org](https://nodejs.org))
-- **MariaDB** installé et démarré sur le PC hôte
-- Connexion au **réseau wifi API** de la mini-usine (pour le mode réel)
+1. **Prérequis** :
+   - Disposer d'une base de données MariaDB (WAMP/XAMPP ou Docker).
+   - Avoir Node.js installé.
+   - Le PC doit être connecté au **réseau WiFi de l'API**.
 
----
+2. **Configuration** :
+   Copiez le fichier de configuration :
+   ```bash
+   cp .env.example .env
+   ```
+   Répétez vos identifiants SQL si nécessaire (par défaut : `root` sans mot de passe, DB `tp2_maintenance_z4`).
 
-## 🚀 Installation
+3. **Démarrage** :
+   - Installez les dépendances : `npm install`
+   - Démarrez l'application :
+   ```bash
+   LANCER.bat
+   ```
+   *(Ou manuellement : `node backend/server.js`)*
 
-### 1. Cloner le dépôt
-
-```bash
-git clone https://github.com/Axel-Moron/TPusineConnectee.git
-cd TPusineConnectee
-```
-
-### 2. Configurer l'environnement
-
-```bash
-cp .env.example .env
-```
-
-Éditez le fichier `.env` si nécessaire (mot de passe MariaDB, IP automate, etc.).
-
-### 3. Configurer la base de données
-
-Exécutez le script de configuration :
-
-```bash
-# Sous Windows :
-SETUP_BDD.bat
-```
-
-Ou manuellement dans MariaDB :
-
-```sql
-CREATE DATABASE IF NOT EXISTS tp2_maintenance_z4;
-```
-
-### 4. Installer les dépendances
-
-```bash
-cd backend
-npm install
-```
+4. **Accès** :
+   - Dashboard de supervision : [http://localhost:3000](http://localhost:3000)
 
 ---
 
-## ▶️ Lancement
+## ⚙️ Configuration Automate M580 (Paramètres modifiables via le dashboard)
 
-### Option 1 : Script automatique (Windows)
-
-Double-cliquez sur **`LANCER.bat`** à la racine du projet. Il :
-1. Vérifie la présence de Node.js
-2. Installe les dépendances (`npm install`)
-3. Démarre le serveur
-
-### Option 2 : Ligne de commande
-
-```bash
-cd backend
-npm start
-```
-
-Puis ouvrez votre navigateur sur **http://localhost:3000**
+| Description | Type Modbus | Adresse | Remarque |
+|---|---|---|---|
+| **IP de l'automate** | Réseau TCP | `172.16.1.24` | Port 502 |
+| **Température** | Holding Register | `%MF706` | Décodage Little Endian Word Swap |
+| **Cycle Auto Zone 3** | Coil / Bit | `%M640` | `0` = Vrai / Lancé, `1` = Arrêté |
+| **Voyant Rouge** | Coil / Bit | `%M702` | |
+| **Voyant Orange** | Coil / Bit | `%M701` | |
+| **Voyant Vert** | Coil / Bit | `%M703` | |
+| **Heartbeat (optionnel)**| Holding Register | `%MW700` | Signale à l'API que la supervision est active à 1Hz |
 
 ---
 
-## 🐳 Utilisation avec Docker
+## 📂 Organisation du code
 
-```bash
-docker compose up --build
-```
-
-L'application sera disponible sur **http://localhost:3000**
-
-> **Note :** L'application Docker utilise `host.docker.internal` pour accéder au MariaDB installé sur le PC hôte.
-
----
-
-## ⚙️ Configuration
-
-Toute la configuration se fait via le fichier `.env` à la racine :
-
-| Variable               | Description                                  | Valeur par défaut |
-|------------------------|----------------------------------------------|-------------------|
-| `PORT`                 | Port du serveur web                          | `3000`            |
-| `DB_HOST`              | Hôte MariaDB                                 | `127.0.0.1`       |
-| `DB_PORT`              | Port MariaDB                                 | `3306`            |
-| `DB_USER`              | Utilisateur MariaDB                          | `root`            |
-| `DB_PASSWORD`          | Mot de passe MariaDB                         | *(vide)*          |
-| `DB_NAME`              | Nom de la base de données                    | `tp2_maintenance_z4` |
-| `MODBUS_IP`            | IP de l'automate M580                        | `172.16.1.23`     |
-| `MODBUS_PORT`          | Port Modbus TCP                              | `502`             |
-| `REGISTRE_TEMPERATURE` | Adresse registre température                 | `180`             |
-| `DIVISEUR_TEMPERATURE` | Diviseur pour conversion température         | `20`              |
-| `REGISTRE_CYCLE_AUTO`  | Adresse bit cycle auto                       | `640`             |
-| `FREQUENCE_LECTURE`    | Intervalle de lecture Modbus (en secondes)    | `3`               |
-
----
-
-## 📂 Structure du projet
-
-```
-TPusineConnectee/
-├── .env.example             # Modèle de configuration
-├── .gitignore               # Fichiers ignorés par Git
-├── docker-compose.yml       # Configuration Docker Compose
-├── LANCER.bat               # Script de lancement rapide (Windows)
-├── SETUP_BDD.bat            # Script de configuration MariaDB
-├── setup.sql                # Script SQL de création de la BDD
-├── README.md                # Ce fichier
+```text
+/
+├── backend/
+│   ├── config/       # Connexion à la base de données
+│   ├── models/       # Tables BDD (Mesures, Seuils, Alarmes)
+│   ├── routes/       # API REST pour le Frontend
+│   └── services/     # Logiques Modbus, Prédictif, Alarmes, CSV
 │
-├── backend/                 # Serveur Node.js
-│   ├── server.js            # Point d'entrée du serveur Express
-│   ├── package.json         # Dépendances npm
-│   ├── Dockerfile           # Image Docker du backend
-│   ├── .dockerignore        # Fichiers ignorés par Docker
-│   ├── config/
-│   │   └── db.js            # Configuration Sequelize (connexion MariaDB)
-│   ├── models/
-│   │   ├── Mesure.js        # Modèle Sequelize — mesures de température
-│   │   ├── Seuil.js         # Modèle Sequelize — seuils d'alarme
-│   │   └── Alarme.js        # Modèle Sequelize — journal des alarmes
-│   ├── routes/
-│   │   └── api.js           # Routes REST (/api/status, /api/seuils, etc.)
-│   └── services/
-│       ├── modbusService.js  # Communication Modbus TCP avec l'automate
-│       ├── alarmService.js   # Logique de gestion des alarmes
-│       ├── csvService.js     # Export CSV des mesures et alarmes
-│       ├── predictiveService.js  # Calculs de maintenance prédictive
-│       └── scheduler.js      # Planificateur de lectures périodiques
+├── frontend/         # Dashboard Web (index.html, styles.css)
 │
-├── frontend/                # Interface web
-│   ├── index.html           # Page principale (dashboard, historique, alarmes)
-│   └── style.css            # Feuille de styles
-│
-└── csv/                     # Dossier CSV pour traçabilité (monté en volume Docker)
+├── .env.example      # Template des variables d'environnement
+├── README.md         # Ce document !
+└── setup.sql         # Script optionnel de création de compte SQL
 ```
-
----
-
-## 👥 Auteurs
-
-- **MORON Axel**
-- **RAHARINJATOVO Lucien**
-
-Projet réalisé dans le cadre du TP2 de Maintenance Connectée — UniLaSalle Amiens, promotion I5PAUC 2025/2026.

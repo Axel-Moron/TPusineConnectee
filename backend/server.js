@@ -33,6 +33,7 @@ import apiRoutes from "./routes/api.js";
 // Import des services
 import { initScheduler } from "./services/scheduler.js";
 import { initCSVFiles } from "./services/csvService.js";
+import { startHeartbeat } from "./services/modbusService.js";
 
 // --- Configuration Express ---
 const app = express();
@@ -118,14 +119,15 @@ const startServer = async () => {
         console.log(`📊 Seuils chargés depuis BDD : TH=${dernierSeuil.tres_haut} H=${dernierSeuil.haut} B=${dernierSeuil.bas} TB=${dernierSeuil.tres_bas}`);
     }
 
-    // 5. Démarrage du scheduler (lectures Modbus périodiques)
+    // 5. Démarrage du scheduler et du heartbeat
     await initScheduler();
+    startHeartbeat();
 
     // 6. Lancement du serveur HTTP
     const PORT = process.env.PORT || 3000;
     app.listen(PORT, "0.0.0.0", () => {
         console.log(`🚀 Serveur démarré sur http://localhost:${PORT}`);
-        console.log(`📡 Automate Modbus : ${process.env.MODBUS_IP || "172.16.1.23"}:${process.env.MODBUS_PORT || 502}`);
+        console.log(`📡 Automate Modbus : ${process.env.MODBUS_IP || "172.16.1.24"}:${process.env.MODBUS_PORT || 502}`);
         console.log(`🗄️  Base de données : ${process.env.DB_HOST || "127.0.0.1"}:${process.env.DB_PORT || 3306}/${process.env.DB_NAME || "tp2_maintenance_z4"}`);
         console.log("=".repeat(60));
     });

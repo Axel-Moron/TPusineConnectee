@@ -314,8 +314,8 @@
         <!-- ============================================================ -->
         <main class="page-content hidden" id="section-parametres">
             <div class="info-box" style="margin-bottom: 20px;">
-                <strong>Architecture du système :</strong> Le PC lit les données depuis l'automate API M580 (172.16.1.23)
-                via Modbus TCP. L'automate récupère la température depuis la passerelle Banner (172.16.1.65)
+                <strong>Architecture du système :</strong> Le PC lit les données depuis l'automate API M580 (172.16.1.24)
+                via Modbus TCP. L'automate récupère la température depuis la passerelle Banner
                 via son service Modbus DTM. Le PC doit être connecté au <strong>wifi API</strong> pour communiquer.
             </div>
 
@@ -325,13 +325,13 @@
                     <h3>&#128225; Communication Modbus TCP</h3>
 
                     <div class="setting-row">
-                        <label>IP Automate (API M580)</label>
-                        <input type="text" id="cfg-modbus-ip" value="172.16.1.23" placeholder="172.16.1.23">
+                        <label for="cfg-modbus-ip">IP Automate (API M580)</label>
+                        <input type="text" id="cfg-modbus-ip" value="172.16.1.24" placeholder="172.16.1.24" title="Adresse IP de l'automate M580">
                     </div>
 
                     <div class="setting-row">
-                        <label>Port Modbus TCP</label>
-                        <input type="number" id="cfg-modbus-port" value="502" placeholder="502">
+                        <label for="cfg-modbus-port">Port Modbus TCP</label>
+                        <input type="number" id="cfg-modbus-port" value="502" placeholder="502" title="Port TCP">
                     </div>
 
                     <button class="btn-settings" onclick="sauverParametresModbus()">Appliquer</button>
@@ -343,23 +343,18 @@
                     <h3>&#128203; Registres Modbus</h3>
 
                     <div class="setting-row">
-                        <label>Registre Température</label>
-                        <input type="number" id="cfg-reg-temp" value="180">
+                        <label for="cfg-reg-temp">Registre Température (%MF)</label>
+                        <input type="number" id="cfg-reg-temp" value="706" title="Registre de température" placeholder="706">
                     </div>
 
                     <div class="setting-row">
-                        <label>Diviseur Température</label>
-                        <input type="number" id="cfg-div-temp" value="20">
+                        <label for="cfg-reg-cycle">Registre Cycle Auto (%M)</label>
+                        <input type="number" id="cfg-reg-cycle" value="640" title="Registre cycle auto" placeholder="640">
                     </div>
 
                     <div class="setting-row">
-                        <label>Registre Cycle Auto</label>
-                        <input type="number" id="cfg-reg-cycle" value="640">
-                    </div>
-
-                    <div class="setting-row">
-                        <label>Fréquence de lecture (sec)</label>
-                        <input type="number" id="cfg-frequence" value="3" min="1" max="60">
+                        <label for="cfg-frequence">Fréquence de lecture (sec)</label>
+                        <input type="number" id="cfg-frequence" value="3" min="1" max="60" title="Fréquence" placeholder="3">
                     </div>
 
                     <button class="btn-settings" onclick="sauverParametresRegistres()">Appliquer</button>
@@ -378,32 +373,64 @@
                     </div>
 
                     <div class="setting-row">
-                        <label>Activer la recopie</label>
+                        <label for="cfg-colonne-enabled">Activer la recopie</label>
                         <label class="switch switch-sm">
-                            <input type="checkbox" id="cfg-colonne-enabled" checked onchange="toggleColonneConfig()">
+                            <input type="checkbox" id="cfg-colonne-enabled" checked onchange="toggleColonneConfig()" title="Activer recopie">
                             <span class="slider"></span>
                         </label>
                     </div>
 
                     <div id="colonne-config-fields">
                         <div class="setting-row">
-                            <label>Coil voyant rouge (%M)</label>
-                            <input type="number" id="cfg-coil-rouge" value="100" placeholder="Ex: 100">
+                            <label for="cfg-coil-rouge">Coil voyant rouge (%M)</label>
+                            <input type="number" id="cfg-coil-rouge" value="702" placeholder="Ex: 702" title="Coil rouge">
                         </div>
 
                         <div class="setting-row">
-                            <label>Coil voyant orange (%M)</label>
-                            <input type="number" id="cfg-coil-orange" value="101" placeholder="Ex: 101">
+                            <label for="cfg-coil-orange">Coil voyant orange (%M)</label>
+                            <input type="number" id="cfg-coil-orange" value="701" placeholder="Ex: 701" title="Coil orange">
                         </div>
 
                         <div class="setting-row">
-                            <label>Coil voyant vert (%M)</label>
-                            <input type="number" id="cfg-coil-vert" value="102" placeholder="Ex: 102">
+                            <label for="cfg-coil-vert">Coil voyant vert (%M)</label>
+                            <input type="number" id="cfg-coil-vert" value="703" placeholder="Ex: 703" title="Coil vert">
                         </div>
                     </div>
 
                     <button class="btn-settings" onclick="sauverParametresColonne()">Appliquer</button>
                     <div class="settings-feedback" id="feedback-colonne"></div>
+                </div>
+
+                <!-- Heartbeat vers l'automate -->
+                <div class="card settings-section">
+                    <h3>&#128147; Heartbeat</h3>
+
+                    <div class="info-box">
+                        <strong>Signal de présence :</strong> Le PC écrit périodiquement sur un registre
+                        de l'automate (%MW700) pour signaler qu'il est actif.
+                        La valeur bascule entre 0 et 1 à la fréquence configurée.
+                    </div>
+
+                    <div class="setting-row">
+                        <label for="cfg-heartbeat-enabled">Activer le heartbeat</label>
+                        <label class="switch switch-sm">
+                            <input type="checkbox" id="cfg-heartbeat-enabled" checked title="Activer heartbeat">
+                            <span class="slider"></span>
+                        </label>
+                    </div>
+
+                    <div class="setting-row">
+                        <label for="cfg-reg-heartbeat">Registre heartbeat (%MW)</label>
+                        <input type="number" id="cfg-reg-heartbeat" value="700" placeholder="Ex: 700" title="Registre heartbeat">
+                    </div>
+
+                    <div class="setting-row">
+                        <label for="cfg-heartbeat-freq">Période (ms)</label>
+                        <input type="number" id="cfg-heartbeat-freq" value="1000" min="100" max="10000" placeholder="1000" title="Fréquence heartbeat">
+                    </div>
+
+                    <button class="btn-settings" onclick="sauverParametresHeartbeat()">Appliquer</button>
+                    <div class="settings-feedback" id="feedback-heartbeat"></div>
                 </div>
             </div>
         </main>
@@ -983,11 +1010,17 @@
                 if (cfg.modbusIp) document.getElementById('cfg-modbus-ip').value = cfg.modbusIp;
                 if (cfg.modbusPort) document.getElementById('cfg-modbus-port').value = cfg.modbusPort;
                 if (cfg.registreTemperature) document.getElementById('cfg-reg-temp').value = cfg.registreTemperature;
-                if (cfg.diviseurTemperature) document.getElementById('cfg-div-temp').value = cfg.diviseurTemperature;
                 if (cfg.registreCycleAuto) document.getElementById('cfg-reg-cycle').value = cfg.registreCycleAuto;
                 if (cfg.frequenceLecture) document.getElementById('cfg-frequence').value = cfg.frequenceLecture;
+                
+                // Heartbeat
+                const heartbeatEnabled = cfg.heartbeatEnabled !== false; // true by default
+                document.getElementById('cfg-heartbeat-enabled').checked = heartbeatEnabled;
+                if (cfg.registreHeartbeat) document.getElementById('cfg-reg-heartbeat').value = cfg.registreHeartbeat;
+                if (cfg.heartbeatFreq) document.getElementById('cfg-heartbeat-freq').value = cfg.heartbeatFreq;
+                
                 // Colonne lumineuse
-                const colonneEnabled = cfg.colonneEnabled || false;
+                const colonneEnabled = cfg.colonneEnabled !== false; // true by default
                 document.getElementById('cfg-colonne-enabled').checked = colonneEnabled;
                 toggleColonneConfig();
                 if (cfg.coilRouge !== undefined) document.getElementById('cfg-coil-rouge').value = cfg.coilRouge;
@@ -1029,7 +1062,6 @@
         async function sauverParametresRegistres() {
             const config = {
                 registreTemperature: parseInt(document.getElementById('cfg-reg-temp').value),
-                diviseurTemperature: parseInt(document.getElementById('cfg-div-temp').value),
                 registreCycleAuto: parseInt(document.getElementById('cfg-reg-cycle').value),
                 frequenceLecture: parseInt(document.getElementById('cfg-frequence').value)
             };
@@ -1066,6 +1098,25 @@
             }
         }
 
+        async function sauverParametresHeartbeat() {
+            const config = {
+                heartbeatEnabled: document.getElementById('cfg-heartbeat-enabled').checked,
+                registreHeartbeat: parseInt(document.getElementById('cfg-reg-heartbeat').value),
+                heartbeatFreq: parseInt(document.getElementById('cfg-heartbeat-freq').value)
+            };
+            try {
+                const res = await fetch(`${API_URL}/config`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(config)
+                });
+                const data = await res.json();
+                afficherSettingsFeedback('feedback-heartbeat', data);
+            } catch (e) {
+                afficherSettingsFeedback('feedback-heartbeat', { error: 'Erreur de communication' });
+            }
+        }
+
         function afficherSettingsFeedback(elementId, data) {
             const fb = document.getElementById(elementId);
             if (data.success) {
@@ -1088,4 +1139,4 @@
         chargerParametres();                           // Charger la config Modbus
     </script>
 </body>
-</h
+</html>
