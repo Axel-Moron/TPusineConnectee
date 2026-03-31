@@ -16,8 +16,15 @@ services:
       MYSQL_DATABASE: tp2_maintenance_z4
     volumes:
       - db_data:/var/lib/mysql
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql:ro   # Initialisation des tables au premier démarrage
     ports:
       - "3307:3306"             # Ouvert sur 3307 pour ne pas entrer en conflit avec un MariaDB local
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
 
   # --- Application principal : Backend Node.js + Frontend statique ---
   app:
@@ -25,19 +32,18 @@ services:
     container_name: tp2-app
     restart: unless-stopped
     depends_on:
-      - db
+      db:
+        condition: service_healthy    # Attend que MariaDB soit prêt avant de démarrer
     ports:
       - "3000:3000"            # Port d'accès à l'application web
     env_file: .env
     environment:
       - DB_HOST=db             # Utilise le service 'db' interne au réseau Docker
+      - DB_PORT=3306
       - DB_USER=root
       - DB_PASSWORD=root
       - FRONTEND_PATH=/app/frontend
-      # (Optionnel) Désactive le mode simulation par défaut si souhaité
       - NODE_ENV=production
-    extra_hosts:
-      - "host.docker.internal:host-gateway"   # Permet d'accéder au MariaDB du PC hôte si besoin
     volumes:
       - ./frontend:/app/frontend               # Montage du frontend
       - ./csv:/app/csv                         # Montage du dossier CSV pour traçabilité
