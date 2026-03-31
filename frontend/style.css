@@ -832,6 +832,7 @@ body.light-theme .nav-item.active { background: rgba(51, 154, 240, 0.08); }
     display: grid;
     grid-template-columns: repeat(3, 1fr);
     gap: 16px;
+    align-items: start;
 }
 
 .settings-section {

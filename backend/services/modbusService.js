@@ -176,39 +176,72 @@ export const readCycleAuto = async () => {
     }
 };
 
+let currentVoyant = 'normal';
+let toggleBlink = false;
+let lastEtatVoyants = { r: null, o: null, v: null };
+
+// Boucle de clignotement à 1Hz (bascule toutes les 500ms)
+setInterval(() => {
+    toggleBlink = !toggleBlink;
+    // On force la mise à jour seulement si un état clignotant est actif
+    if (currentVoyant === 'rouge_clignotant' || currentVoyant === 'vert_clignotant') {
+        updateColonneLumineuse().catch(() => {});
+    }
+}, 500);
+
 /**
- * Écriture des voyants de la colonne lumineuse vers l'automate via Modbus TCP
- * Utilise la fonction Modbus 05 (Write Single Coil) pour chaque voyant
+ * Fonction interne qui écrit les états sur l'automate
  */
-export const writeColonneLumineuse = async (voyant) => {
+const updateColonneLumineuse = async () => {
     if (!COLONNE_ENABLED || MODE_SIMULATION) return;
 
-    const rouge = voyant === 'rouge_clignotant' || voyant === 'rouge_fixe';
-    const orange = voyant === 'orange_fixe';
-    const vert = voyant === 'vert_clignotant' || voyant === 'vert_fixe';
+    let rouge = false;
+    let orange = false;
+    let vert = false;
+
+    if (currentVoyant === 'rouge_fixe') rouge = true;
+    if (currentVoyant === 'orange_fixe') orange = true;
+    if (currentVoyant === 'vert_fixe') vert = true;
+    
+    if (currentVoyant === 'rouge_clignotant') rouge = toggleBlink;
+    if (currentVoyant === 'vert_clignotant') vert = toggleBlink;
 
     const client = new ModbusRTU();
     try {
-        await withTimeout(client.connectTCP(MODBUS_IP, { port: MODBUS_PORT }));
+        // Timeout réduit pour ne pas bloquer trop longtemps si l'automate est lent
+        await withTimeout(client.connectTCP(MODBUS_IP, { port: MODBUS_PORT }), 2000);
         client.setID(1);
-        client.setTimeout(3000);
+        client.setTimeout(1000);
 
         await client.writeCoil(COIL_ROUGE, rouge);
         await client.writeCoil(COIL_ORANGE, orange);
         await client.writeCoil(COIL_VERT, vert);
 
-        console.log(`💡 Colonne lumineuse : R=${rouge ? 1 : 0} O=${orange ? 1 : 0} V=${vert ? 1 : 0}`);
+        // Afficher l'état seulement s'il a changé (évite le spam à cause du timer de 500ms)
+        if (rouge !== lastEtatVoyants.r || orange !== lastEtatVoyants.o || vert !== lastEtatVoyants.v) {
+            console.log(`💡 Colonne lumineuse : R=${rouge ? 1 : 0} O=${orange ? 1 : 0} V=${vert ? 1 : 0}`);
+            lastEtatVoyants = { r: rouge, o: orange, v: vert };
+        }
     } catch (error) {
         if (error.code !== 'ETIMEDOUT' && error.message !== 'Timeout global Modbus') {
-            console.error(`❌ Erreur écriture colonne lumineuse :`, error.message);
+            // Silencieux pour ne pas spammer les logs en cas de déconnexion momentanée
         }
     } finally {
         try { client.close(() => { }); } catch (e) { }
     }
 };
 
+/**
+ * Écriture des voyants de la colonne lumineuse vers l'automate via Modbus TCP
+ * Appelée par le scheduler lors d'un changement d'alarme
+ */
+export const writeColonneLumineuse = async (voyant) => {
+    currentVoyant = voyant;
+    await updateColonneLumineuse();
+};
+
 // =============================================================================
-// Heartbeat — Écriture périodique sur %MW700
+// Heartbeat — Écriture périodique sur %M (Coil)
 // Bascule la valeur entre 0 et 1 à la fréquence configurée (1Hz par défaut)
 // Permet à l'automate de détecter que le PC de supervision est actif
 // =============================================================================
@@ -220,7 +253,7 @@ const writeHeartbeat = async () => {
         client.setTimeout(2000);
 
         heartbeatState = !heartbeatState;
-        await client.writeRegister(REG_HEARTBEAT, heartbeatState ? 1 : 0);
+        await client.writeCoil(REG_HEARTBEAT, heartbeatState);
 
     } catch (error) {
         // Silencieux pour ne pas spammer les logs

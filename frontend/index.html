@@ -86,7 +86,7 @@
                 <div class="mode-toggle">
                     <span class="mode-label" id="mode-label" style="color: #51cf66;">MODBUS RÉEL</span>
                     <label class="switch">
-                        <input type="checkbox" id="mode-switch" onchange="toggleMode()">
+                        <input type="checkbox" id="mode-switch" onchange="toggleMode()" title="Basculer mode simulation/réel">
                         <span class="slider"></span>
                     </label>
                 </div>
@@ -206,28 +206,28 @@
                     </div>
                     <div class="seuils-form">
                         <div class="seuil-row seuil-tres-haut">
-                            <label>Très Haut (TH)</label>
+                            <label for="input-tres-haut">Très Haut (TH)</label>
                             <div class="seuil-input-group">
                                 <input type="number" id="input-tres-haut" step="0.5" value="40">
                                 <span class="seuil-unit">°C</span>
                             </div>
                         </div>
                         <div class="seuil-row seuil-haut">
-                            <label>Haut (H)</label>
+                            <label for="input-haut">Haut (H)</label>
                             <div class="seuil-input-group">
                                 <input type="number" id="input-haut" step="0.5" value="35">
                                 <span class="seuil-unit">°C</span>
                             </div>
                         </div>
                         <div class="seuil-row seuil-bas">
-                            <label>Bas (B)</label>
+                            <label for="input-bas">Bas (B)</label>
                             <div class="seuil-input-group">
                                 <input type="number" id="input-bas" step="0.5" value="18">
                                 <span class="seuil-unit">°C</span>
                             </div>
                         </div>
                         <div class="seuil-row seuil-tres-bas">
-                            <label>Très Bas (TB)</label>
+                            <label for="input-tres-bas">Très Bas (TB)</label>
                             <div class="seuil-input-group">
                                 <input type="number" id="input-tres-bas" step="0.5" value="10">
                                 <span class="seuil-unit">°C</span>
@@ -251,11 +251,11 @@
                 </div>
                 <div class="historique-controls">
                     <div class="date-group">
-                        <label>Du :</label>
+                        <label for="hist-start">Du :</label>
                         <input type="datetime-local" id="hist-start">
                     </div>
                     <div class="date-group">
-                        <label>Au :</label>
+                        <label for="hist-end">Au :</label>
                         <input type="datetime-local" id="hist-end">
                     </div>
                     <button class="btn-seuils" onclick="chargerHistorique()">Charger</button>
@@ -343,7 +343,7 @@
                     <h3>&#128203; Registres Modbus</h3>
 
                     <div class="setting-row">
-                        <label for="cfg-reg-temp">Registre Température (%MF)</label>
+                        <label for="cfg-reg-temp">Registre temp. (%MW)</label>
                         <input type="number" id="cfg-reg-temp" value="706" title="Registre de température" placeholder="706">
                     </div>
 
@@ -406,27 +406,29 @@
                     <h3>&#128147; Heartbeat</h3>
 
                     <div class="info-box">
-                        <strong>Signal de présence :</strong> Le PC écrit périodiquement sur un registre
-                        de l'automate (%MW700) pour signaler qu'il est actif.
+                        <strong>Signal de présence :</strong> Le PC écrit périodiquement sur un coil
+                        de l'automate (%M700) pour signaler qu'il est actif.
                         La valeur bascule entre 0 et 1 à la fréquence configurée.
                     </div>
 
                     <div class="setting-row">
                         <label for="cfg-heartbeat-enabled">Activer le heartbeat</label>
                         <label class="switch switch-sm">
-                            <input type="checkbox" id="cfg-heartbeat-enabled" checked title="Activer heartbeat">
+                            <input type="checkbox" id="cfg-heartbeat-enabled" checked onchange="toggleHeartbeatConfig()" title="Activer heartbeat">
                             <span class="slider"></span>
                         </label>
                     </div>
 
-                    <div class="setting-row">
-                        <label for="cfg-reg-heartbeat">Registre heartbeat (%MW)</label>
-                        <input type="number" id="cfg-reg-heartbeat" value="700" placeholder="Ex: 700" title="Registre heartbeat">
-                    </div>
+                    <div id="heartbeat-config-fields">
+                        <div class="setting-row">
+                            <label for="cfg-reg-heartbeat">Coil heartbeat (%M)</label>
+                            <input type="number" id="cfg-reg-heartbeat" value="700" placeholder="Ex: 700" title="Coil heartbeat">
+                        </div>
 
-                    <div class="setting-row">
-                        <label for="cfg-heartbeat-freq">Période (ms)</label>
-                        <input type="number" id="cfg-heartbeat-freq" value="1000" min="100" max="10000" placeholder="1000" title="Fréquence heartbeat">
+                        <div class="setting-row">
+                            <label for="cfg-heartbeat-freq">Période (ms)</label>
+                            <input type="number" id="cfg-heartbeat-freq" value="1000" min="100" max="10000" placeholder="1000" title="Fréquence heartbeat">
+                        </div>
                     </div>
 
                     <button class="btn-settings" onclick="sauverParametresHeartbeat()">Appliquer</button>
@@ -1012,13 +1014,14 @@
                 if (cfg.registreTemperature) document.getElementById('cfg-reg-temp').value = cfg.registreTemperature;
                 if (cfg.registreCycleAuto) document.getElementById('cfg-reg-cycle').value = cfg.registreCycleAuto;
                 if (cfg.frequenceLecture) document.getElementById('cfg-frequence').value = cfg.frequenceLecture;
-                
+
                 // Heartbeat
                 const heartbeatEnabled = cfg.heartbeatEnabled !== false; // true by default
                 document.getElementById('cfg-heartbeat-enabled').checked = heartbeatEnabled;
+                toggleHeartbeatConfig();
                 if (cfg.registreHeartbeat) document.getElementById('cfg-reg-heartbeat').value = cfg.registreHeartbeat;
                 if (cfg.heartbeatFreq) document.getElementById('cfg-heartbeat-freq').value = cfg.heartbeatFreq;
-                
+
                 // Colonne lumineuse
                 const colonneEnabled = cfg.colonneEnabled !== false; // true by default
                 document.getElementById('cfg-colonne-enabled').checked = colonneEnabled;
@@ -1034,6 +1037,16 @@
         function toggleColonneConfig() {
             const enabled = document.getElementById('cfg-colonne-enabled').checked;
             const fields = document.getElementById('colonne-config-fields');
+            if (enabled) {
+                fields.classList.remove('disabled');
+            } else {
+                fields.classList.add('disabled');
+            }
+        }
+
+        function toggleHeartbeatConfig() {
+            const enabled = document.getElementById('cfg-heartbeat-enabled').checked;
+            const fields = document.getElementById('heartbeat-config-fields');
             if (enabled) {
                 fields.classList.remove('disabled');
             } else {

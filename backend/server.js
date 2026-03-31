@@ -100,7 +100,7 @@ const startServer = async () => {
     await autoConfigDB();
 
     // 2. Synchronisation des modèles Sequelize (crée/met à jour les tables)
-    await sequelize.sync({ alter: true });
+    await sequelize.sync();
     console.log("✅ Tables BDD synchronisées (mesures, seuils, alarmes)");
 
     // 3. Initialisation des fichiers CSV

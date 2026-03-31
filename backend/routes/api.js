@@ -17,7 +17,7 @@ import { Op } from "sequelize";
 import Mesure from "../models/Mesure.js";
 import Seuil from "../models/Seuil.js";
 import Alarme from "../models/Alarme.js";
-import { appendSeuilCSV } from "../services/csvService.js";
+import { appendSeuilCSV, appendAlarmeCSV } from "../services/csvService.js";
 import { setSimulationMode, getSimulationMode, getModbusConfig, setModbusConfig } from "../services/modbusService.js";
 import {
     getDerniereTemperature,
@@ -107,6 +107,16 @@ router.post("/seuils", async (req, res) => {
 
         // 3. Écriture dans le fichier seuils.csv
         appendSeuilCSV(nouveauxSeuils);
+
+        // 4. Historisation dans les alarmes pour la traçabilité demandée
+        const alarmeData = {
+            type_evenement: 'declenchement',
+            niveau: 'info',
+            message: `Modification des seuils : TH=${th} H=${h} B=${b} TB=${tb}`,
+            temperature: getDerniereTemperature() || 0
+        };
+        await Alarme.create(alarmeData);
+        appendAlarmeCSV(alarmeData);
 
         console.log(`✅ Seuils modifiés : TH=${th} H=${h} B=${b} TB=${tb}`);
         res.json({ success: true, seuils: nouveauxSeuils });
