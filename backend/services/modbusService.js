@@ -148,7 +148,7 @@ export const readTemperature = async () => {
 
 /**
  * Lecture de l'état du cycle automatique Zone 3 via Modbus TCP
- * Lit le coil %M640 (FC01)
+ * Lit le registre holding %MW704 (FC03) — info TOR : 0=ARRÊTÉ, non-zéro=LANCÉ
  */
 export const readCycleAuto = async () => {
     if (MODE_SIMULATION) return true;
@@ -159,11 +159,11 @@ export const readCycleAuto = async () => {
         client.setID(1);
         client.setTimeout(3000);
 
-        const data = await client.readCoils(REG_CYCLE_AUTO, 1);
-        // Le sujet indique : "cycle auto lancé sur la zone 3 correspond au bit %M640=0"
-        const cycleActif = (data.data[0] === false);
+        // Lecture du registre holding %MW704 (FC03) — info TOR cycle auto Zone 3
+        const data = await client.readHoldingRegisters(REG_CYCLE_AUTO, 1);
+        const cycleActif = data.data[0] !== 0;  // 0 = ARRÊTÉ, toute valeur non nulle = LANCÉ
 
-        console.log(`✅ Cycle auto Zone 3 : ${cycleActif ? "LANCÉ" : "ARRÊTÉ"}`);
+        console.log(`✅ Cycle auto Zone 3 : ${cycleActif ? "LANCÉ" : "ARRÊTÉ"} (registre %MW${REG_CYCLE_AUTO} = ${data.data[0]})`);
         return cycleActif;
 
     } catch (error) {

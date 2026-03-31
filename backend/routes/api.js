@@ -135,13 +135,11 @@ router.post("/seuils", async (req, res) => {
 router.get("/historique", async (req, res) => {
     try {
         const { start, end, limit } = req.query;
-        const whereClause = { type: 'temperature' };  // Uniquement les températures
+        const whereClause = { temperature: { [Op.not]: null } };  // Lignes avec une température
 
         // Filtre par période si les dates sont fournies
         if (start && end) {
-            const startDate = new Date(start);
-            const endDate = new Date(end);
-            whereClause.timestamp = { [Op.between]: [startDate, endDate] };
+            whereClause.timestamp = { [Op.between]: [new Date(start), new Date(end)] };
         }
 
         // Récupération des mesures triées chronologiquement
@@ -149,7 +147,7 @@ router.get("/historique", async (req, res) => {
             where: whereClause,
             order: [["timestamp", "ASC"]],
             limit: parseInt(limit) || 2000,
-            attributes: ['valeur', 'timestamp']   // Seulement les champs nécessaires
+            attributes: ['temperature', 'cycle_auto', 'timestamp']
         });
 
         res.json(mesures);
@@ -233,7 +231,7 @@ router.get("/seuils/historique", async (req, res) => {
 router.get("/export/mesures", async (req, res) => {
     try {
         const { start, end } = req.query;
-        const whereClause = { type: 'temperature' };
+        const whereClause = { temperature: { [Op.not]: null } };
 
         if (start && end) {
             whereClause.timestamp = {
@@ -243,14 +241,16 @@ router.get("/export/mesures", async (req, res) => {
 
         const mesures = await Mesure.findAll({
             where: whereClause,
-            order: [["timestamp", "ASC"]]
+            order: [["timestamp", "ASC"]],
+            attributes: ['temperature', 'cycle_auto', 'timestamp']
         });
 
         // Génération du contenu CSV
-        let csv = "Date;Heure;Temperature_C\r\n";
+        let csv = "Date;Heure;Temperature_C;Cycle_Auto\r\n";
         mesures.forEach(m => {
             const d = new Date(m.timestamp);
-            csv += `${d.toLocaleDateString('fr-FR')};${d.toLocaleTimeString('fr-FR')};${m.valeur}\r\n`;
+            const cycleStr = m.cycle_auto === null ? '' : (m.cycle_auto ? 'LANCÉ' : 'ARRÊTÉ');
+            csv += `${d.toLocaleDateString('fr-FR')};${d.toLocaleTimeString('fr-FR')};${m.temperature};${cycleStr}\r\n`;
         });
 
         res.header("Content-Type", "text/csv; charset=utf-8");

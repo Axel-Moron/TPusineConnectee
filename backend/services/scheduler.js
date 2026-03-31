@@ -107,29 +107,22 @@ const executerCycleLecture = async () => {
         const cycleAuto = await readCycleAuto();
 
         // --- 3. Historisation en base de données ---
-        if (temperature !== null) {
-            // Enregistrement de la mesure de température
+        // Un seul enregistrement par cycle : température + cycle_auto ensemble
+        if (temperature !== null || cycleAuto !== null) {
             await Mesure.create({
-                type: 'temperature',
-                valeur: temperature,
+                temperature: temperature,
+                cycle_auto: cycleAuto !== null ? (cycleAuto ? 1 : 0) : null,
                 timestamp: now
             });
+        }
 
-            // Mise à jour de l'état global
+        if (temperature !== null) {
             derniereTemperature = temperature;
             dernierTimestamp = now;
-
-            // Ajout au buffer du service prédictif
             ajouterMesure(temperature, now);
         }
 
         if (cycleAuto !== null) {
-            // Enregistrement de l'état du cycle auto
-            await Mesure.create({
-                type: 'cycle_auto',
-                valeur: cycleAuto ? 1 : 0,
-                timestamp: now
-            });
             dernierCycleAuto = cycleAuto;
         }
 
