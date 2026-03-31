@@ -1,0 +1,36 @@
+# =============================================================================
+# .gitignore - TP2 Maintenance Connectée
+# =============================================================================
+
+# --- Dépendances Node.js ---
+node_modules/
+package-lock.json
+
+# --- Variables d'environnement (contient des mots de passe) ---
+.env
+
+# --- Logs ---
+*.log
+npm-debug.log*
+
+# --- OS ---
+Thumbs.db
+Desktop.ini
+.DS_Store
+
+# --- IDE ---
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# --- Fichiers de test temporaires ---
+test_env.mjs
+backend/test_env.js
+backend/test_env2.js
+
+# --- CSV de données générées (traçabilité locale) ---
+csv/alarmes.csv
+csv/seuils.csv
+backend/csv/alarmes.csv
+backend/csv/seuils.csv

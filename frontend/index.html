@@ -1,0 +1,1091 @@
+<!DOCTYPE html>
+<html lang="fr">
+<!--
+  =============================================================================
+  TP2 - Maintenance Connectée - Interface Web de Supervision
+  Groupe Z4 : MORON Axel & RAHARINJATOVO Lucien
+  UniLaSalle Amiens - I5PAUC 2025/2026
+
+  Cette page web affiche en temps réel :
+    - La température du capteur Banner (Zone 3) sous forme de courbe et de valeur
+    - L'état du cycle automatique Zone 3 (lancé ou arrêté)
+    - Les 4 seuils réglables (très haut, haut, bas, très bas)
+    - Les alarmes avec messages et indicateurs visuels (voyants colorés)
+    - Les indicateurs de maintenance prédictive (estimation du temps avant seuil)
+
+  Technologies : HTML5, CSS3, JavaScript (vanilla), Chart.js
+  Communication : API REST (fetch) avec rafraîchissement toutes les 2 secondes
+  =============================================================================
+-->
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TP2 - Supervision Maintenance Connectée - Zone 3</title>
+    <link rel="stylesheet" href="style.css">
+    <!-- Chart.js pour les graphiques temps réel -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Adaptateur date pour l'axe temporel des graphiques -->
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
+</head>
+<body>
+    <!-- ====== BARRE LATÉRALE DE NAVIGATION ====== -->
+    <aside class="sidebar">
+        <div class="sidebar-logo">
+            <div class="logo-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M12 2L2 7l10 5 10-5-10-5z"/>
+                    <path d="M2 17l10 5 10-5"/>
+                    <path d="M2 12l10 5 10-5"/>
+                </svg>
+            </div>
+            <span class="logo-text">SUPERVISION</span>
+            <span class="logo-sub">Zone 3</span>
+        </div>
+        <nav class="sidebar-nav">
+            <div class="nav-section">TABLEAU DE BORD</div>
+            <a href="#" class="nav-item active" onclick="afficherSection('dashboard')">
+                <span class="nav-icon">&#9632;</span> Temps réel
+            </a>
+            <a href="#" class="nav-item" onclick="afficherSection('historique')">
+                <span class="nav-icon">&#9776;</span> Historique
+            </a>
+            <a href="#" class="nav-item" onclick="afficherSection('alarmes-page')">
+                <span class="nav-icon">&#9888;</span> Alarmes
+            </a>
+            <div class="nav-section">CONFIGURATION</div>
+            <a href="#" class="nav-item" onclick="afficherSection('parametres')">
+                <span class="nav-icon">&#9881;</span> Paramètres
+            </a>
+        </nav>
+        <div class="sidebar-footer">
+            <div class="group-info">
+                <span>Groupe Z4</span>
+                <small>MORON & RAHARINJATOVO</small>
+            </div>
+        </div>
+    </aside>
+
+    <!-- ====== CONTENU PRINCIPAL ====== -->
+    <div class="main-content">
+
+        <!-- ====== BARRE SUPÉRIEURE ====== -->
+        <header class="topbar">
+            <div class="topbar-left">
+                <h1>Maintenance Connectée</h1>
+                <p class="subtitle">Capteur température sans fil - Zone 3 Mini-Usine</p>
+            </div>
+            <div class="topbar-right">
+                <!-- Bouton Mode Jour/Nuit -->
+                <button class="theme-toggle-btn" id="theme-toggle" onclick="toggleTheme()" title="Mode jour/nuit">&#9790;</button>
+                <!-- Badge de connexion au backend -->
+                <div class="status-badge" id="badge-connexion">
+                    <span class="badge-dot"></span>
+                    <span class="badge-text">Connexion...</span>
+                </div>
+                <!-- Toggle mode simulation / réel -->
+                <div class="mode-toggle">
+                    <span class="mode-label" id="mode-label" style="color: #51cf66;">MODBUS RÉEL</span>
+                    <label class="switch">
+                        <input type="checkbox" id="mode-switch" onchange="toggleMode()">
+                        <span class="slider"></span>
+                    </label>
+                </div>
+                <!-- Horloge -->
+                <div class="clock">
+                    <span id="clock-time">--:--:--</span>
+                    <span id="clock-date">--/--/----</span>
+                </div>
+            </div>
+        </header>
+
+        <!-- ============================================================ -->
+        <!-- SECTION DASHBOARD (TEMPS RÉEL)                               -->
+        <!-- ============================================================ -->
+        <main class="page-content" id="section-dashboard">
+            <div class="dashboard-grid">
+
+                <!-- --- Carte : Température actuelle --- -->
+                <div class="card temp-card">
+                    <div class="card-header">
+                        <h2>Température actuelle</h2>
+                        <span class="card-badge" id="temp-status-badge">--</span>
+                    </div>
+                    <div class="temp-display">
+                        <div class="temp-value-wrapper">
+                            <span class="temp-value" id="temp-value">--</span>
+                            <span class="temp-unit">°C</span>
+                        </div>
+                        <div class="temp-timestamp" id="temp-timestamp">En attente...</div>
+                    </div>
+                    <!-- Jauge visuelle de la température -->
+                    <div class="temp-gauge">
+                        <div class="gauge-bar">
+                            <div class="gauge-zone zone-tres-bas" id="gauge-tres-bas"></div>
+                            <div class="gauge-zone zone-bas" id="gauge-bas"></div>
+                            <div class="gauge-zone zone-normal" id="gauge-normal"></div>
+                            <div class="gauge-zone zone-haut" id="gauge-haut"></div>
+                            <div class="gauge-zone zone-tres-haut" id="gauge-tres-haut"></div>
+                            <div class="gauge-cursor" id="gauge-cursor"></div>
+                        </div>
+                        <div class="gauge-labels">
+                            <span id="gauge-label-tb">--</span>
+                            <span id="gauge-label-b">--</span>
+                            <span id="gauge-label-h">--</span>
+                            <span id="gauge-label-th">--</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- --- Carte : État cycle auto Zone 3 --- -->
+                <div class="card cycle-card">
+                    <div class="card-header">
+                        <h2>Cycle Auto Zone 3</h2>
+                    </div>
+                    <div class="cycle-display">
+                        <div class="cycle-indicator" id="cycle-indicator">
+                            <div class="cycle-icon" id="cycle-icon">?</div>
+                        </div>
+                        <span class="cycle-text" id="cycle-text">En attente...</span>
+                    </div>
+                </div>
+
+                <!-- --- Carte : Voyant d'alarme (colonne lumineuse virtuelle) --- -->
+                <div class="card voyant-card">
+                    <div class="card-header">
+                        <h2>Colonne lumineuse</h2>
+                    </div>
+                    <div class="voyant-display">
+                        <div class="colonne-lumineuse">
+                            <div class="voyant voyant-rouge" id="voyant-rouge"></div>
+                            <div class="voyant voyant-orange" id="voyant-orange"></div>
+                            <div class="voyant voyant-vert" id="voyant-vert"></div>
+                        </div>
+                        <div class="alarme-message" id="alarme-message">Aucune alarme</div>
+                    </div>
+                </div>
+
+                <!-- --- Carte : Indicateurs prédictifs --- -->
+                <div class="card prediction-card">
+                    <div class="card-header">
+                        <h2>Maintenance Prédictive</h2>
+                        <span class="card-badge badge-info" id="prediction-badge">Inactif</span>
+                    </div>
+                    <div class="prediction-display">
+                        <div class="prediction-icon" id="prediction-icon">&#8942;</div>
+                        <div class="prediction-info">
+                            <span class="prediction-message" id="prediction-message">En attente de données...</span>
+                            <div class="prediction-details">
+                                <span class="prediction-pente" id="prediction-pente">Pente : --</span>
+                                <span class="prediction-temps" id="prediction-temps"></span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- --- Carte : Graphique temps réel --- -->
+                <div class="card chart-card">
+                    <div class="card-header">
+                        <h2>Courbe de température</h2>
+                        <div class="chart-controls">
+                            <button class="btn-range active" onclick="setRange(5, this)">5 min</button>
+                            <button class="btn-range" onclick="setRange(15, this)">15 min</button>
+                            <button class="btn-range" onclick="setRange(60, this)">1h</button>
+                            <button class="btn-range" onclick="setRange(240, this)">4h</button>
+                            <button class="btn-range" onclick="setRange(1440, this)">24h</button>
+                        </div>
+                    </div>
+                    <div class="chart-container">
+                        <canvas id="chartTemperature"></canvas>
+                    </div>
+                </div>
+
+                <!-- --- Carte : Réglage des seuils --- -->
+                <div class="card seuils-card">
+                    <div class="card-header">
+                        <h2>Réglage des seuils</h2>
+                    </div>
+                    <div class="seuils-form">
+                        <div class="seuil-row seuil-tres-haut">
+                            <label>Très Haut (TH)</label>
+                            <div class="seuil-input-group">
+                                <input type="number" id="input-tres-haut" step="0.5" value="40">
+                                <span class="seuil-unit">°C</span>
+                            </div>
+                        </div>
+                        <div class="seuil-row seuil-haut">
+                            <label>Haut (H)</label>
+                            <div class="seuil-input-group">
+                                <input type="number" id="input-haut" step="0.5" value="35">
+                                <span class="seuil-unit">°C</span>
+                            </div>
+                        </div>
+                        <div class="seuil-row seuil-bas">
+                            <label>Bas (B)</label>
+                            <div class="seuil-input-group">
+                                <input type="number" id="input-bas" step="0.5" value="18">
+                                <span class="seuil-unit">°C</span>
+                            </div>
+                        </div>
+                        <div class="seuil-row seuil-tres-bas">
+                            <label>Très Bas (TB)</label>
+                            <div class="seuil-input-group">
+                                <input type="number" id="input-tres-bas" step="0.5" value="10">
+                                <span class="seuil-unit">°C</span>
+                            </div>
+                        </div>
+                        <button class="btn-seuils" onclick="envoyerSeuils()">Appliquer les seuils</button>
+                        <div class="seuils-feedback" id="seuils-feedback"></div>
+                    </div>
+                </div>
+
+            </div>
+        </main>
+
+        <!-- ============================================================ -->
+        <!-- SECTION HISTORIQUE                                            -->
+        <!-- ============================================================ -->
+        <main class="page-content hidden" id="section-historique">
+            <div class="card" style="padding: 24px;">
+                <div class="card-header">
+                    <h2>Historique des mesures</h2>
+                </div>
+                <div class="historique-controls">
+                    <div class="date-group">
+                        <label>Du :</label>
+                        <input type="datetime-local" id="hist-start">
+                    </div>
+                    <div class="date-group">
+                        <label>Au :</label>
+                        <input type="datetime-local" id="hist-end">
+                    </div>
+                    <button class="btn-seuils" onclick="chargerHistorique()">Charger</button>
+                    <button class="btn-export" onclick="exporterMesures()">Exporter CSV</button>
+                </div>
+                <div class="chart-container" style="height: 400px;">
+                    <canvas id="chartHistorique"></canvas>
+                </div>
+            </div>
+            <!-- Historique des seuils -->
+            <div class="card" style="padding: 24px; margin-top: 16px;">
+                <div class="card-header">
+                    <h2>Historique des modifications de seuils</h2>
+                </div>
+                <table class="data-table" id="table-seuils-hist">
+                    <thead>
+                        <tr>
+                            <th>Date</th>
+                            <th>Très Haut</th>
+                            <th>Haut</th>
+                            <th>Bas</th>
+                            <th>Très Bas</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tbody-seuils-hist"></tbody>
+                </table>
+            </div>
+        </main>
+
+        <!-- ============================================================ -->
+        <!-- SECTION ALARMES                                               -->
+        <!-- ============================================================ -->
+        <main class="page-content hidden" id="section-alarmes-page">
+            <div class="card" style="padding: 24px;">
+                <div class="card-header">
+                    <h2>Journal des alarmes</h2>
+                    <button class="btn-export" onclick="chargerAlarmesPage()">Rafraîchir</button>
+                </div>
+                <table class="data-table" id="table-alarmes">
+                    <thead>
+                        <tr>
+                            <th>Date/Heure</th>
+                            <th>Type</th>
+                            <th>Niveau</th>
+                            <th>Message</th>
+                            <th>Température</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tbody-alarmes"></tbody>
+                </table>
+            </div>
+        </main>
+
+        <!-- ============================================================ -->
+        <!-- SECTION PARAMÈTRES                                            -->
+        <!-- ============================================================ -->
+        <main class="page-content hidden" id="section-parametres">
+            <div class="info-box" style="margin-bottom: 20px;">
+                <strong>Architecture du système :</strong> Le PC lit les données depuis l'automate API M580 (172.16.1.23)
+                via Modbus TCP. L'automate récupère la température depuis la passerelle Banner (172.16.1.65)
+                via son service Modbus DTM. Le PC doit être connecté au <strong>wifi API</strong> pour communiquer.
+            </div>
+
+            <div class="settings-grid">
+                <!-- Paramètres Communication Modbus -->
+                <div class="card settings-section">
+                    <h3>&#128225; Communication Modbus TCP</h3>
+
+                    <div class="setting-row">
+                        <label>IP Automate (API M580)</label>
+                        <input type="text" id="cfg-modbus-ip" value="172.16.1.23" placeholder="172.16.1.23">
+                    </div>
+
+                    <div class="setting-row">
+                        <label>Port Modbus TCP</label>
+                        <input type="number" id="cfg-modbus-port" value="502" placeholder="502">
+                    </div>
+
+                    <button class="btn-settings" onclick="sauverParametresModbus()">Appliquer</button>
+                    <div class="settings-feedback" id="feedback-modbus"></div>
+                </div>
+
+                <!-- Paramètres Registres -->
+                <div class="card settings-section">
+                    <h3>&#128203; Registres Modbus</h3>
+
+                    <div class="setting-row">
+                        <label>Registre Température</label>
+                        <input type="number" id="cfg-reg-temp" value="180">
+                    </div>
+
+                    <div class="setting-row">
+                        <label>Diviseur Température</label>
+                        <input type="number" id="cfg-div-temp" value="20">
+                    </div>
+
+                    <div class="setting-row">
+                        <label>Registre Cycle Auto</label>
+                        <input type="number" id="cfg-reg-cycle" value="640">
+                    </div>
+
+                    <div class="setting-row">
+                        <label>Fréquence de lecture (sec)</label>
+                        <input type="number" id="cfg-frequence" value="3" min="1" max="60">
+                    </div>
+
+                    <button class="btn-settings" onclick="sauverParametresRegistres()">Appliquer</button>
+                    <div class="settings-feedback" id="feedback-registres"></div>
+                </div>
+
+                <!-- Recopie Colonne Lumineuse vers armoire API -->
+                <div class="card settings-section">
+                    <h3>&#128161; Recopie Colonne Lumineuse</h3>
+
+                    <div class="info-box">
+                        <strong>Recopie vers l'armoire :</strong> Les voyants de la page principale
+                        (rouge, orange, vert) sont recopiés vers la colonne lumineuse physique
+                        de l'armoire API via écriture de coils (FC05).
+                        Actif uniquement en <strong>mode réel</strong> (désactivé en simulation).
+                    </div>
+
+                    <div class="setting-row">
+                        <label>Activer la recopie</label>
+                        <label class="switch switch-sm">
+                            <input type="checkbox" id="cfg-colonne-enabled" checked onchange="toggleColonneConfig()">
+                            <span class="slider"></span>
+                        </label>
+                    </div>
+
+                    <div id="colonne-config-fields">
+                        <div class="setting-row">
+                            <label>Coil voyant rouge (%M)</label>
+                            <input type="number" id="cfg-coil-rouge" value="100" placeholder="Ex: 100">
+                        </div>
+
+                        <div class="setting-row">
+                            <label>Coil voyant orange (%M)</label>
+                            <input type="number" id="cfg-coil-orange" value="101" placeholder="Ex: 101">
+                        </div>
+
+                        <div class="setting-row">
+                            <label>Coil voyant vert (%M)</label>
+                            <input type="number" id="cfg-coil-vert" value="102" placeholder="Ex: 102">
+                        </div>
+                    </div>
+
+                    <button class="btn-settings" onclick="sauverParametresColonne()">Appliquer</button>
+                    <div class="settings-feedback" id="feedback-colonne"></div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- ====== SCRIPTS JAVASCRIPT ====== -->
+    <script>
+        // =====================================================================
+        // Configuration globale
+        // =====================================================================
+        const API_URL = window.location.origin + "/api";
+        let chartTemperature = null;       // Instance Chart.js pour le temps réel
+        let chartHistorique = null;        // Instance Chart.js pour l'historique
+        let currentRange = 5;              // Plage par défaut : 5 minutes
+        let intervalRefresh = null;        // Intervalle de rafraîchissement
+
+        // =====================================================================
+        // Horloge temps réel (mise à jour chaque seconde)
+        // =====================================================================
+        function updateClock() {
+            const now = new Date();
+            document.getElementById('clock-time').textContent = now.toLocaleTimeString('fr-FR');
+            document.getElementById('clock-date').textContent = now.toLocaleDateString('fr-FR');
+        }
+        setInterval(updateClock, 1000);
+        updateClock();
+
+        // =====================================================================
+        // Navigation entre les sections (Dashboard, Historique, Alarmes)
+        // =====================================================================
+        function afficherSection(sectionId) {
+            // Masquer toutes les sections
+            document.querySelectorAll('.page-content').forEach(s => s.classList.add('hidden'));
+            // Afficher la section demandée
+            document.getElementById('section-' + sectionId).classList.remove('hidden');
+            // Mettre à jour la navigation active
+            document.querySelectorAll('.nav-item').forEach(item => item.classList.remove('active'));
+            event.currentTarget.classList.add('active');
+
+            // Charger les données spécifiques à la section
+            if (sectionId === 'historique') {
+                chargerHistoriqueSeuils();
+                // Pré-remplir les dates (dernières 24h)
+                const now = new Date();
+                const hier = new Date(now.getTime() - 24 * 3600 * 1000);
+                document.getElementById('hist-end').value = now.toISOString().slice(0, 16);
+                document.getElementById('hist-start').value = hier.toISOString().slice(0, 16);
+            }
+            if (sectionId === 'alarmes-page') {
+                chargerAlarmesPage();
+            }
+        }
+
+        // =====================================================================
+        // Basculer entre mode simulation et mode réel (Modbus TCP)
+        // =====================================================================
+        async function toggleMode() {
+            const isSimu = document.getElementById("mode-switch").checked;
+            const label = document.getElementById("mode-label");
+            label.textContent = isSimu ? "SIMULATION" : "MODBUS RÉEL";
+            label.style.color = isSimu ? "#ff6b6b" : "#51cf66";
+            try {
+                await fetch(`${API_URL}/mode`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ simulation: isSimu })
+                });
+            } catch (e) {
+                console.error("Erreur switch mode:", e);
+            }
+        }
+
+        // =====================================================================
+        // Envoi des seuils de température au serveur
+        // Validation côté client puis envoi POST /api/seuils
+        // =====================================================================
+        async function envoyerSeuils() {
+            const seuils = {
+                tres_haut: parseFloat(document.getElementById('input-tres-haut').value),
+                haut: parseFloat(document.getElementById('input-haut').value),
+                bas: parseFloat(document.getElementById('input-bas').value),
+                tres_bas: parseFloat(document.getElementById('input-tres-bas').value)
+            };
+
+            // Validation de cohérence : TB < B < H < TH
+            if (seuils.tres_bas >= seuils.bas || seuils.bas >= seuils.haut || seuils.haut >= seuils.tres_haut) {
+                afficherFeedback("Erreur : les seuils doivent respecter TB < B < H < TH", "error");
+                return;
+            }
+
+            try {
+                const res = await fetch(`${API_URL}/seuils`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(seuils)
+                });
+                const data = await res.json();
+                if (data.success) {
+                    afficherFeedback("Seuils appliqués avec succès !", "success");
+                } else {
+                    afficherFeedback("Erreur : " + (data.error || "Inconnue"), "error");
+                }
+            } catch (e) {
+                afficherFeedback("Erreur de communication avec le serveur", "error");
+            }
+        }
+
+        /**
+         * Affiche un message de retour après l'envoi des seuils
+         */
+        function afficherFeedback(msg, type) {
+            const el = document.getElementById('seuils-feedback');
+            el.textContent = msg;
+            el.className = 'seuils-feedback ' + type;
+            setTimeout(() => { el.textContent = ''; el.className = 'seuils-feedback'; }, 4000);
+        }
+
+        // =====================================================================
+        // Sélection de la plage temporelle pour le graphique temps réel
+        // =====================================================================
+        function setRange(minutes, btn) {
+            currentRange = minutes;
+            document.querySelectorAll('.btn-range').forEach(b => b.classList.remove('active'));
+            if (btn) btn.classList.add('active');
+            chargerDonneesGraphique();
+        }
+
+        // =====================================================================
+        // BOUCLE PRINCIPALE : rafraîchissement des données temps réel
+        // Appelle GET /api/status toutes les 2 secondes
+        // =====================================================================
+        async function rafraichirDashboard() {
+            const badge = document.getElementById('badge-connexion');
+            try {
+                const res = await fetch(`${API_URL}/status`, {
+                    signal: AbortSignal.timeout(3000)
+                });
+                const data = await res.json();
+
+                // --- Mise à jour du badge de connexion ---
+                badge.querySelector('.badge-dot').className = 'badge-dot online';
+                badge.querySelector('.badge-text').textContent = 'Connecté';
+
+                // --- Synchronisation du mode ---
+                const sw = document.getElementById('mode-switch');
+                if (sw.checked !== data.mode_simulation) {
+                    sw.checked = data.mode_simulation;
+                    const label = document.getElementById('mode-label');
+                    label.textContent = data.mode_simulation ? "SIMULATION" : "MODBUS RÉEL";
+                    label.style.color = data.mode_simulation ? "#ff6b6b" : "#51cf66";
+                }
+
+                // --- Température ---
+                if (data.temperature !== null && data.temperature !== undefined) {
+                    document.getElementById('temp-value').textContent = data.temperature.toFixed(1);
+                    if (data.timestamp) {
+                        const d = new Date(data.timestamp);
+                        document.getElementById('temp-timestamp').textContent =
+                            `Dernière lecture : ${d.toLocaleTimeString('fr-FR')}`;
+                    }
+                } else {
+                    document.getElementById('temp-value').textContent = 'N/D';
+                    document.getElementById('temp-timestamp').textContent = 'En attente de lecture...';
+                }
+
+                // --- Seuils (synchroniser les inputs) ---
+                if (data.seuils) {
+                    // Mise à jour des labels de la jauge
+                    document.getElementById('gauge-label-tb').textContent = data.seuils.tres_bas + '°C';
+                    document.getElementById('gauge-label-b').textContent = data.seuils.bas + '°C';
+                    document.getElementById('gauge-label-h').textContent = data.seuils.haut + '°C';
+                    document.getElementById('gauge-label-th').textContent = data.seuils.tres_haut + '°C';
+
+                    // Mise à jour de la position du curseur sur la jauge
+                    if (data.temperature !== null) {
+                        mettreAJourJauge(data.temperature, data.seuils);
+                    }
+                }
+
+                // --- Cycle auto Zone 3 ---
+                mettreAJourCycleAuto(data.cycle_auto);
+
+                // --- Alarmes et voyants ---
+                if (data.alarme) {
+                    mettreAJourAlarme(data.alarme);
+                }
+
+                // --- Badge de statut température ---
+                if (data.alarme) {
+                    const badge2 = document.getElementById('temp-status-badge');
+                    badge2.textContent = data.alarme.niveau === 'normal' ? 'Normal' :
+                        data.alarme.niveau.replace('_', ' ').toUpperCase();
+                    badge2.className = 'card-badge badge-' + data.alarme.niveau;
+                }
+
+                // --- Indicateurs prédictifs ---
+                if (data.prediction) {
+                    mettreAJourPrediction(data.prediction);
+                }
+
+            } catch (e) {
+                // Serveur déconnecté
+                badge.querySelector('.badge-dot').className = 'badge-dot offline';
+                badge.querySelector('.badge-text').textContent = 'Déconnecté';
+            }
+        }
+
+        // =====================================================================
+        // Mise à jour de la jauge visuelle de température
+        // Positionne le curseur en fonction de la température et des seuils
+        // =====================================================================
+        function mettreAJourJauge(temperature, seuils) {
+            const min = seuils.tres_bas - 5;
+            const max = seuils.tres_haut + 5;
+            const range = max - min;
+            const pourcent = Math.max(0, Math.min(100, ((temperature - min) / range) * 100));
+            document.getElementById('gauge-cursor').style.left = pourcent + '%';
+        }
+
+        // =====================================================================
+        // Mise à jour de l'affichage du cycle automatique Zone 3
+        // =====================================================================
+        function mettreAJourCycleAuto(cycleAuto) {
+            const indicator = document.getElementById('cycle-indicator');
+            const icon = document.getElementById('cycle-icon');
+            const text = document.getElementById('cycle-text');
+
+            if (cycleAuto === true) {
+                indicator.className = 'cycle-indicator actif';
+                icon.innerHTML = '&#9654;';  // Symbole Play
+                text.textContent = 'CYCLE AUTO LANCÉ';
+                text.style.color = '#51cf66';
+            } else if (cycleAuto === false) {
+                indicator.className = 'cycle-indicator inactif';
+                icon.innerHTML = '&#9632;';  // Symbole Stop
+                text.textContent = 'CYCLE AUTO ARRÊTÉ';
+                text.style.color = '#ff6b6b';
+            } else {
+                indicator.className = 'cycle-indicator inconnu';
+                icon.innerHTML = '?';
+                text.textContent = 'ÉTAT INCONNU';
+                text.style.color = '#868e96';
+            }
+        }
+
+        // =====================================================================
+        // Mise à jour des voyants de la colonne lumineuse et du message d'alarme
+        // Conforme au cahier des charges :
+        //   - Très haut : rouge clignotant
+        //   - Haut : rouge fixe
+        //   - Normal : orange fixe
+        //   - Bas : vert fixe
+        //   - Très bas : vert clignotant
+        // =====================================================================
+        function mettreAJourAlarme(alarme) {
+            const rouge = document.getElementById('voyant-rouge');
+            const orange = document.getElementById('voyant-orange');
+            const vert = document.getElementById('voyant-vert');
+            const message = document.getElementById('alarme-message');
+
+            // Reset tous les voyants
+            rouge.className = 'voyant voyant-rouge';
+            orange.className = 'voyant voyant-orange';
+            vert.className = 'voyant voyant-vert';
+
+            switch (alarme.voyant) {
+                case 'rouge_clignotant':
+                    rouge.classList.add('actif', 'clignotant');
+                    break;
+                case 'rouge_fixe':
+                    rouge.classList.add('actif');
+                    break;
+                case 'orange_fixe':
+                    orange.classList.add('actif');
+                    break;
+                case 'vert_fixe':
+                    vert.classList.add('actif');
+                    break;
+                case 'vert_clignotant':
+                    vert.classList.add('actif', 'clignotant');
+                    break;
+            }
+
+            message.textContent = alarme.message || 'Fonctionnement normal';
+            message.style.color = alarme.couleur || '#ff9900';
+        }
+
+        // =====================================================================
+        // Mise à jour des indicateurs de maintenance prédictive
+        // =====================================================================
+        function mettreAJourPrediction(prediction) {
+            const badge = document.getElementById('prediction-badge');
+            const icon = document.getElementById('prediction-icon');
+            const msg = document.getElementById('prediction-message');
+            const pente = document.getElementById('prediction-pente');
+            const temps = document.getElementById('prediction-temps');
+
+            msg.textContent = prediction.message;
+
+            if (prediction.actif) {
+                badge.textContent = 'Actif';
+                badge.className = 'card-badge badge-warning';
+
+                // Flèche directionnelle
+                if (prediction.direction === 'monte') {
+                    icon.innerHTML = '&#8593;';  // Flèche haut
+                    icon.style.color = '#ff6b6b';
+                } else {
+                    icon.innerHTML = '&#8595;';  // Flèche bas
+                    icon.style.color = '#51cf66';
+                }
+                msg.style.color = '#ffd43b';
+            } else {
+                badge.textContent = 'Stable';
+                badge.className = 'card-badge badge-info';
+                icon.innerHTML = '&#8644;';  // Flèches horizontales
+                icon.style.color = '#868e96';
+                msg.style.color = '#ced4da';
+            }
+
+            // Affichage de la pente si disponible
+            if (prediction.pente !== undefined && prediction.pente !== null) {
+                const penteVal = (prediction.pente * 60).toFixed(2);  // Convertir en °C/min
+                pente.textContent = `Pente : ${penteVal} °C/min`;
+            }
+
+            if (prediction.tempsEstime) {
+                temps.textContent = `Estimation : ${prediction.tempsEstime}s`;
+            } else {
+                temps.textContent = '';
+            }
+        }
+
+        // =====================================================================
+        // Chargement et rendu du graphique de température temps réel
+        // =====================================================================
+        async function chargerDonneesGraphique() {
+            try {
+                const end = new Date();
+                const start = new Date(end.getTime() - currentRange * 60000);
+
+                const params = new URLSearchParams({
+                    start: start.toISOString(),
+                    end: end.toISOString(),
+                    limit: 2000
+                });
+
+                const res = await fetch(`${API_URL}/historique?${params}`);
+                const data = await res.json();
+
+                // Récupérer les seuils actuels pour les lignes horizontales
+                const resSeuils = await fetch(`${API_URL}/seuils`);
+                const seuils = await resSeuils.json();
+
+                rendreGraphiqueTempsReel(data, seuils);
+            } catch (e) {
+                console.error("Erreur chargement graphique:", e);
+            }
+        }
+
+        /**
+         * Rendu du graphique temps réel avec Chart.js
+         * Affiche la courbe de température + lignes de seuils
+         */
+        function rendreGraphiqueTempsReel(data, seuils) {
+            const ctx = document.getElementById('chartTemperature').getContext('2d');
+
+            if (chartTemperature) chartTemperature.destroy();
+            if (data.length === 0) return;
+
+            const labels = data.map(d => new Date(d.timestamp));
+            const values = data.map(d => d.valeur);
+
+            // Datasets : courbe principale + lignes de seuils
+            const datasets = [
+                {
+                    label: 'Température (°C)',
+                    data: values,
+                    borderColor: '#339af0',
+                    backgroundColor: 'rgba(51, 154, 240, 0.1)',
+                    borderWidth: 2,
+                    pointRadius: 0,
+                    pointHoverRadius: 4,
+                    fill: true,
+                    tension: 0.3
+                },
+                {
+                    label: 'Seuil Très Haut',
+                    data: new Array(data.length).fill(seuils.tres_haut),
+                    borderColor: '#ff0000',
+                    borderWidth: 2,
+                    borderDash: [8, 4],
+                    pointRadius: 0,
+                    fill: false
+                },
+                {
+                    label: 'Seuil Haut',
+                    data: new Array(data.length).fill(seuils.haut),
+                    borderColor: '#ff6b6b',
+                    borderWidth: 1.5,
+                    borderDash: [5, 5],
+                    pointRadius: 0,
+                    fill: false
+                },
+                {
+                    label: 'Seuil Bas',
+                    data: new Array(data.length).fill(seuils.bas),
+                    borderColor: '#51cf66',
+                    borderWidth: 1.5,
+                    borderDash: [5, 5],
+                    pointRadius: 0,
+                    fill: false
+                },
+                {
+                    label: 'Seuil Très Bas',
+                    data: new Array(data.length).fill(seuils.tres_bas),
+                    borderColor: '#0000ff',
+                    borderWidth: 2,
+                    borderDash: [8, 4],
+                    pointRadius: 0,
+                    fill: false
+                }
+            ];
+
+            chartTemperature = new Chart(ctx, {
+                type: 'line',
+                data: { labels, datasets },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    animation: { duration: 300 },
+                    scales: {
+                        x: {
+                            type: 'time',
+                            time: { unit: currentRange <= 15 ? 'minute' : 'hour', displayFormats: { minute: 'HH:mm', hour: 'HH:mm' } },
+                            grid: { color: 'rgba(255,255,255,0.05)' },
+                            ticks: { color: '#868e96', maxTicksLimit: 8 }
+                        },
+                        y: {
+                            grid: { color: 'rgba(255,255,255,0.05)' },
+                            ticks: { color: '#868e96', callback: v => v + '°C' }
+                        }
+                    },
+                    plugins: {
+                        legend: {
+                            display: true,
+                            labels: { color: '#ced4da', usePointStyle: true, pointStyle: 'line', padding: 15 }
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: ctx => ctx.dataset.label + ': ' + ctx.parsed.y.toFixed(1) + '°C'
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        // =====================================================================
+        // Section Historique : chargement des données et export CSV
+        // =====================================================================
+        async function chargerHistorique() {
+            const start = document.getElementById('hist-start').value;
+            const end = document.getElementById('hist-end').value;
+            if (!start || !end) return;
+
+            try {
+                const params = new URLSearchParams({ start, end });
+                const [resMesures, resSeuils] = await Promise.all([
+                    fetch(`${API_URL}/historique?${params}`),
+                    fetch(`${API_URL}/seuils`)
+                ]);
+                const mesures = await resMesures.json();
+                const seuils = await resSeuils.json();
+
+                const ctx = document.getElementById('chartHistorique').getContext('2d');
+                if (chartHistorique) chartHistorique.destroy();
+                if (mesures.length === 0) return;
+
+                chartHistorique = new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        labels: mesures.map(d => new Date(d.timestamp)),
+                        datasets: [
+                            { label: 'Température', data: mesures.map(d => d.valeur), borderColor: '#339af0', backgroundColor: 'rgba(51,154,240,0.1)', borderWidth: 2, pointRadius: 0, fill: true, tension: 0.3 },
+                            { label: 'TH', data: new Array(mesures.length).fill(seuils.tres_haut), borderColor: '#ff0000', borderWidth: 1.5, borderDash: [5,5], pointRadius: 0, fill: false },
+                            { label: 'H', data: new Array(mesures.length).fill(seuils.haut), borderColor: '#ff6b6b', borderWidth: 1, borderDash: [3,3], pointRadius: 0, fill: false },
+                            { label: 'B', data: new Array(mesures.length).fill(seuils.bas), borderColor: '#51cf66', borderWidth: 1, borderDash: [3,3], pointRadius: 0, fill: false },
+                            { label: 'TB', data: new Array(mesures.length).fill(seuils.tres_bas), borderColor: '#0000ff', borderWidth: 1.5, borderDash: [5,5], pointRadius: 0, fill: false }
+                        ]
+                    },
+                    options: {
+                        responsive: true, maintainAspectRatio: false,
+                        scales: {
+                            x: { type: 'time', grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#868e96' } },
+                            y: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#868e96', callback: v => v + '°C' } }
+                        },
+                        plugins: { legend: { labels: { color: '#ced4da' } } }
+                    }
+                });
+            } catch (e) { console.error(e); }
+        }
+
+        function exporterMesures() {
+            const start = document.getElementById('hist-start').value;
+            const end = document.getElementById('hist-end').value;
+            if (!start || !end) return;
+            window.open(`${API_URL}/export/mesures?start=${start}&end=${end}`);
+        }
+
+        // =====================================================================
+        // Historique des seuils (table)
+        // =====================================================================
+        async function chargerHistoriqueSeuils() {
+            try {
+                const res = await fetch(`${API_URL}/seuils/historique`);
+                const data = await res.json();
+                const tbody = document.getElementById('tbody-seuils-hist');
+                tbody.innerHTML = '';
+                data.forEach(s => {
+                    const d = new Date(s.timestamp);
+                    tbody.innerHTML += `<tr>
+                        <td>${d.toLocaleString('fr-FR')}</td>
+                        <td class="val-th">${s.tres_haut}°C</td>
+                        <td class="val-h">${s.haut}°C</td>
+                        <td class="val-b">${s.bas}°C</td>
+                        <td class="val-tb">${s.tres_bas}°C</td>
+                    </tr>`;
+                });
+            } catch (e) { console.error(e); }
+        }
+
+        // =====================================================================
+        // Page Alarmes (journal)
+        // =====================================================================
+        async function chargerAlarmesPage() {
+            try {
+                const res = await fetch(`${API_URL}/alarmes?limit=200`);
+                const data = await res.json();
+                const tbody = document.getElementById('tbody-alarmes');
+                tbody.innerHTML = '';
+                data.forEach(a => {
+                    const d = new Date(a.timestamp);
+                    const typeClass = a.type_evenement === 'declenchement' ? 'type-decl' : 'type-disp';
+                    tbody.innerHTML += `<tr>
+                        <td>${d.toLocaleString('fr-FR')}</td>
+                        <td class="${typeClass}">${a.type_evenement}</td>
+                        <td>${a.niveau}</td>
+                        <td>${a.message}</td>
+                        <td>${a.temperature !== null ? a.temperature.toFixed(1) + '°C' : '--'}</td>
+                    </tr>`;
+                });
+            } catch (e) { console.error(e); }
+        }
+
+        // =====================================================================
+        // Mode Jour / Nuit (thème clair / sombre)
+        // Sauvegardé dans la mémoire de la session (variable JS)
+        // =====================================================================
+        let isDarkTheme = true;
+
+        function toggleTheme() {
+            isDarkTheme = !isDarkTheme;
+            document.body.classList.toggle('light-theme', !isDarkTheme);
+            const btn = document.getElementById('theme-toggle');
+            btn.textContent = isDarkTheme ? '\u263E' : '\u2600';  // Lune ou Soleil
+            btn.title = isDarkTheme ? 'Passer en mode jour' : 'Passer en mode nuit';
+        }
+
+        // =====================================================================
+        // Page Paramètres : sauvegarde de la configuration Modbus
+        // =====================================================================
+        async function chargerParametres() {
+            try {
+                const res = await fetch(`${API_URL}/config`);
+                const cfg = await res.json();
+                if (cfg.modbusIp) document.getElementById('cfg-modbus-ip').value = cfg.modbusIp;
+                if (cfg.modbusPort) document.getElementById('cfg-modbus-port').value = cfg.modbusPort;
+                if (cfg.registreTemperature) document.getElementById('cfg-reg-temp').value = cfg.registreTemperature;
+                if (cfg.diviseurTemperature) document.getElementById('cfg-div-temp').value = cfg.diviseurTemperature;
+                if (cfg.registreCycleAuto) document.getElementById('cfg-reg-cycle').value = cfg.registreCycleAuto;
+                if (cfg.frequenceLecture) document.getElementById('cfg-frequence').value = cfg.frequenceLecture;
+                // Colonne lumineuse
+                const colonneEnabled = cfg.colonneEnabled || false;
+                document.getElementById('cfg-colonne-enabled').checked = colonneEnabled;
+                toggleColonneConfig();
+                if (cfg.coilRouge !== undefined) document.getElementById('cfg-coil-rouge').value = cfg.coilRouge;
+                if (cfg.coilOrange !== undefined) document.getElementById('cfg-coil-orange').value = cfg.coilOrange;
+                if (cfg.coilVert !== undefined) document.getElementById('cfg-coil-vert').value = cfg.coilVert;
+            } catch (e) {
+                console.error("Erreur chargement paramètres:", e);
+            }
+        }
+
+        function toggleColonneConfig() {
+            const enabled = document.getElementById('cfg-colonne-enabled').checked;
+            const fields = document.getElementById('colonne-config-fields');
+            if (enabled) {
+                fields.classList.remove('disabled');
+            } else {
+                fields.classList.add('disabled');
+            }
+        }
+
+        async function sauverParametresModbus() {
+            const config = {
+                modbusIp: document.getElementById('cfg-modbus-ip').value.trim(),
+                modbusPort: parseInt(document.getElementById('cfg-modbus-port').value)
+            };
+            try {
+                const res = await fetch(`${API_URL}/config`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(config)
+                });
+                const data = await res.json();
+                afficherSettingsFeedback('feedback-modbus', data);
+            } catch (e) {
+                afficherSettingsFeedback('feedback-modbus', { error: 'Erreur de communication' });
+            }
+        }
+
+        async function sauverParametresRegistres() {
+            const config = {
+                registreTemperature: parseInt(document.getElementById('cfg-reg-temp').value),
+                diviseurTemperature: parseInt(document.getElementById('cfg-div-temp').value),
+                registreCycleAuto: parseInt(document.getElementById('cfg-reg-cycle').value),
+                frequenceLecture: parseInt(document.getElementById('cfg-frequence').value)
+            };
+            try {
+                const res = await fetch(`${API_URL}/config`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(config)
+                });
+                const data = await res.json();
+                afficherSettingsFeedback('feedback-registres', data);
+            } catch (e) {
+                afficherSettingsFeedback('feedback-registres', { error: 'Erreur de communication' });
+            }
+        }
+
+        async function sauverParametresColonne() {
+            const config = {
+                colonneEnabled: document.getElementById('cfg-colonne-enabled').checked,
+                coilRouge: parseInt(document.getElementById('cfg-coil-rouge').value),
+                coilOrange: parseInt(document.getElementById('cfg-coil-orange').value),
+                coilVert: parseInt(document.getElementById('cfg-coil-vert').value)
+            };
+            try {
+                const res = await fetch(`${API_URL}/config`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(config)
+                });
+                const data = await res.json();
+                afficherSettingsFeedback('feedback-colonne', data);
+            } catch (e) {
+                afficherSettingsFeedback('feedback-colonne', { error: 'Erreur de communication' });
+            }
+        }
+
+        function afficherSettingsFeedback(elementId, data) {
+            const fb = document.getElementById(elementId);
+            if (data.success) {
+                fb.textContent = "Appliqué avec succès !";
+                fb.className = "settings-feedback success";
+            } else {
+                fb.textContent = "Erreur : " + (data.error || "Inconnue");
+                fb.className = "settings-feedback error";
+            }
+            setTimeout(() => { fb.textContent = ''; fb.className = 'settings-feedback'; }, 4000);
+        }
+
+        // =====================================================================
+        // Démarrage : boucle de rafraîchissement
+        // =====================================================================
+        setInterval(rafraichirDashboard, 2000);       // Status toutes les 2s
+        setInterval(chargerDonneesGraphique, 5000);   // Graphique toutes les 5s
+        rafraichirDashboard();                         // Premier appel immédiat
+        chargerDonneesGraphique();                     // Premier chargement graphique
+        chargerParametres();                           // Charger la config Modbus
+    </script>
+</body>
+</h

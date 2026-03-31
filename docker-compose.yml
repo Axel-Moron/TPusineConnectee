@@ -1,0 +1,24 @@
+# =============================================================================
+# Docker Compose - TP2 Maintenance Connectée
+# Groupe : MORON Axel & RAHARINJATOVO Lucien (Z4)
+# Description : Application web de supervision de température Zone 3
+# =============================================================================
+version: '3.8'
+
+services:
+  # --- Service principal : Backend Node.js + Frontend statique ---
+  app:
+    build: ./backend
+    container_name: tp2-maintenance-connectee
+    ports:
+      - "3000:3000"            # Port d'accès à l'application web
+    env_file: .env
+    extra_hosts:
+      - "host.docker.internal:host-gateway"   # Permet d'accéder au MariaDB du PC hôte
+    volumes:
+      - ./frontend:/app/frontend               # Montage du frontend
+      - ./csv:/app/csv                         # Montage du dossier CSV pour traçabilité
+    restart: unless-stopped
+
+volumes:
+  csv_data:
