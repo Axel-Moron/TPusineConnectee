@@ -14,13 +14,22 @@
 //                                     ↕
 //                           Modbus TCP (automate M580)
 // =============================================================================
-import 'dotenv/config';
+import dotenv from 'dotenv';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+// --- Chargement des variables d'environnement ---
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+// On cherche le fichier .env dans le dossier courant (CWD) ou à la racine du projet (parent de /backend)
+dotenv.config();
+dotenv.config({ path: path.join(__dirname, '..', '.env') });
+
 import express from "express";
 import cors from "cors";
 import mysql2 from "mysql2/promise";
 import sequelize from "./config/db.js";
-import path from 'path';
-import { fileURLToPath } from 'url';
 
 // Import des modèles Sequelize (créent les tables en BDD automatiquement)
 import Capteur from "./models/Capteur.js";
@@ -39,8 +48,6 @@ import { startHeartbeat } from "./services/modbusService.js";
 
 // --- Configuration Express ---
 const app = express();
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
 
 /**
  * Crée automatiquement la base de données si elle n'existe pas

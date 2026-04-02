@@ -27,7 +27,7 @@ echo     Dependances OK
 echo [3] Demarrage du serveur...
 echo.
 echo ============================================================
-echo   Ouvrez votre navigateur sur : http://localhost:3000
+echo   Ouvrez votre navigateur sur : http://localhost:6777
 echo   Appuyez sur Ctrl+C pour arreter le serveur
 echo ============================================================
 echo.

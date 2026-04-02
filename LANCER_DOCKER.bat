@@ -31,8 +31,8 @@ if errorlevel 1 (
 echo.
 echo ============================================================
 echo   L'application est en cours de demarrage...
-echo   Base de donnees (MariaDB) : localhost:3307
-echo   Interface Web : http://localhost:3000
+echo   Base de donnees (MariaDB) : localhost:6778
+echo   Interface Web : http://localhost:6777
 echo ============================================================
 echo.
 echo [INFO] Pour voir les logs du backend : docker logs -f tp2-app
