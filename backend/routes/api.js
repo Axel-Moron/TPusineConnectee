@@ -277,6 +277,68 @@ router.get("/export/mesures", async (req, res) => {
 });
 
 // =============================================================================
+// GET /api/export/alarmes - Export CSV de l'historique des alarmes
+// =============================================================================
+router.get("/export/alarmes", async (req, res) => {
+    try {
+        const { start, end } = req.query;
+        const whereClause = {};
+
+        if (start && end) {
+            whereClause.timestamp = { [Op.between]: [new Date(start), new Date(end)] };
+        }
+
+        const alarmes = await Alarme.findAll({
+            where: whereClause,
+            order: [["timestamp", "ASC"]]
+        });
+
+        let csv = "Date;Heure;Type;Niveau;Message;Temperature\r\n";
+        alarmes.forEach(a => {
+            const d = new Date(a.timestamp);
+            csv += `${d.toLocaleDateString('fr-FR')};${d.toLocaleTimeString('fr-FR')};${a.type_evenement};${a.niveau};${a.message};${a.temperature || ''}\r\n`;
+        });
+
+        res.header("Content-Type", "text/csv; charset=utf-8");
+        res.attachment("export_alarmes.csv");
+        res.send(csv);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// =============================================================================
+// GET /api/export/seuils - Export CSV de l'historique des seuils
+// =============================================================================
+router.get("/export/seuils", async (req, res) => {
+    try {
+        const { start, end } = req.query;
+        const whereClause = {};
+
+        if (start && end) {
+            whereClause.temps = { [Op.between]: [new Date(start), new Date(end)] };
+        }
+
+        const seuils = await Seuil.findAll({
+            where: whereClause,
+            order: [["temps", "ASC"]]
+        });
+
+        let csv = "Date;Heure;Tres_Haut;Haut;Bas;Tres_Bas\r\n";
+        seuils.forEach(s => {
+            const d = new Date(s.temps);
+            csv += `${d.toLocaleDateString('fr-FR')};${d.toLocaleTimeString('fr-FR')};${s.tres_haut};${s.haut};${s.bas};${s.tres_bas}\r\n`;
+        });
+
+        res.header("Content-Type", "text/csv; charset=utf-8");
+        res.attachment("export_seuils.csv");
+        res.send(csv);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// =============================================================================
 // GET /api/config - Récupérer la configuration Modbus et la fréquence
 // Utilisé par la page Paramètres pour afficher la config actuelle
 // =============================================================================

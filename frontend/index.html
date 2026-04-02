@@ -274,6 +274,7 @@
             <div class="card" style="padding: 24px; margin-top: 16px;">
                 <div class="card-header">
                     <h2>Historique des modifications de seuils</h2>
+                    <button class="btn-export" onclick="exporterHistoriqueSeuils()">Exporter CSV</button>
                 </div>
                 <table class="data-table" id="table-seuils-hist">
                     <thead>
@@ -298,7 +299,10 @@
                 <div class="card-header">
                     <h2>Journal des alarmes</h2>
                     <span id="alarmes-compteur" style="color:#868e96;font-size:0.85rem;"></span>
-                    <button class="btn-export" onclick="chargerAlarmesPage(0)">Rafraîchir</button>
+                    <div style="display:flex;gap:8px;">
+                        <button class="btn-export" onclick="exporterAlarmes()">Exporter CSV</button>
+                        <button class="btn-export" onclick="chargerAlarmesPage(0)">Rafraîchir</button>
+                    </div>
                 </div>
                 <table class="data-table" id="table-alarmes">
                     <thead>
@@ -1084,6 +1088,12 @@
             } catch (e) { console.error(e); }
         }
 
+        function exporterHistoriqueSeuils() {
+            // Pas de filtre temporel pour les seuils dans la vue actuelle, 
+            // on exporte tout l'historique disponible.
+            window.open(`${API_URL}/export/seuils`);
+        }
+
         // =====================================================================
         // Page Alarmes (journal) — 20 par page, suppression, pagination
         // =====================================================================
@@ -1130,6 +1140,11 @@
                     (offset + ALARMES_PAGE_SIZE) < data.total ? 'inline-block' : 'none';
 
             } catch (e) { console.error(e); }
+        }
+
+        function exporterAlarmes() {
+            // De même pour les alarmes, on exporte le journal complet
+            window.open(`${API_URL}/export/alarmes`);
         }
 
         function alarmesPaginer(direction) {
