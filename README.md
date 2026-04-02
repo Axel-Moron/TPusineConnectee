@@ -14,7 +14,7 @@ Ce projet met en œuvre une application de supervision temps réel liée à un c
 
 1. **Lecture Modbus TCP** depuis l'automate M580 (`172.16.1.24`) :
    - Température sur `%MF706` (float 32 bits, 2 registres holding FC03).
-   - Cycle auto Zone 3 sur `%MW704` (holding register FC03 — `0` = ARRÊTÉ, non nul = LANCÉ).
+   - Cycle auto Zone 3 sur `%M704` (coil FC01 — `false` = ARRÊTÉ, `true` = LANCÉ).
 
 2. **Historisation en base de données MariaDB** (schéma relationnel) :
    - Table `capteurs` : référentiel des capteurs (température, cycle auto).
@@ -37,10 +37,11 @@ Ce projet met en œuvre une application de supervision temps réel liée à un c
    - `< Seuil bas` → Voyant vert fixe (`%M703`)
    - `< Seuil très bas` → Voyant vert clignotant (`%M703`)
 
-5. **Maintenance Prédictive** (régression linéaire) :
-   - Estimation du temps avant franchissement d'un seuil critique.
+5. **Maintenance Prédictive** :
+   - Estimation du temps avant franchissement d'un seuil critique ou de sortie d'alarme.
+   - **Méthode** : Régression linéaire (moindres carrés) calculée sur l'historique récent (10 dernières mesures). L'algorithme calcule la pente pondérée par le temps (dérivée en °C/sec). Le temps estimé est ensuite obtenu en divisant l'écart avec le seuil par cette pente (T = Δ°C / Pente).
    - Alerte active si le seuil est déjà dépassé (message + indicateur visuel).
-   - Actif uniquement si le cycle auto est lancé.
+   - Actif uniquement si le cycle automatique de la ligne est lancé.
 
 6. **Connexion Power BI** :
    - Connecteur MySQL sur `localhost:6778`, base `tp2_maintenance_z4`.
@@ -90,7 +91,7 @@ docker compose up
 |---|---|---|---|
 | IP de l'automate | TCP | `172.16.1.24:502` | Réseau WiFi API |
 | Température | Holding Register FC03 | `%MF706` (MW706+MW707) | Float 32 bits, Little Endian Word Swap |
-| Cycle Auto Zone 3 | Holding Register FC03 | `%MW704` | 0 = ARRÊTÉ, ≠0 = LANCÉ |
+| Cycle Auto Zone 3 | Coil FC01 | `%M704` | 0 = ARRÊTÉ, 1 = LANCÉ |
 | Voyant Rouge | Coil FC05 | `%M702` | Clignotant = très haut, fixe = haut |
 | Voyant Orange | Coil FC05 | `%M701` | Fixe = plage normale |
 | Voyant Vert | Coil FC05 | `%M703` | Clignotant = très bas, fixe = bas |
@@ -169,5 +170,5 @@ tp2-moron-axel/
 | `MODBUS_IP` | `172.16.1.24` | IP de l'automate M580 |
 | `MODBUS_PORT` | `502` | Port Modbus TCP |
 | `REGISTRE_TEMPERATURE` | `706` | Registre holding %MF706 |
-| `REGISTRE_CYCLE_AUTO` | `704` | Registre holding %MW704 |
+| `REGISTRE_CYCLE_AUTO` | `704` | Coil %M704 |
 | `FREQUENCE_LECTURE` | `3` | Fréquence de lecture en secondes |
