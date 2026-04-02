@@ -7,8 +7,8 @@ node_modules/
 package-lock.json
 
 # --- Variables d'environnement ---
-# (On autorise l'envoi du .env pour ce projet scolaire)
-# .env (commenté pour autoriser le commit)
+# Note : .env est volontairement suivi pour ce projet scolaire
+.env
 
 # --- Logs ---
 *.log

@@ -103,3 +103,33 @@ INSERT IGNORE INTO capteurs (id, designation) VALUES
 INSERT INTO seuil (tres_haut, haut, bas, tres_bas, id_capteur)
 SELECT 40, 35, 18, 10, 1
 WHERE NOT EXISTS (SELECT 1 FROM seuil LIMIT 1);
+
+-- -----------------------------------------------------------------------------
+-- Table : configs
+-- Configuration technique (IP, Ports, Registres, Fréquences).
+-- Permet la persistance des paramètres au-delà du redémarrage Docker.
+-- -----------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS configs (
+    id                   INT          NOT NULL DEFAULT 1,
+    modbusIp             VARCHAR(100) DEFAULT '172.16.1.24',
+    modbusPort           INT          DEFAULT 502,
+    registreTemperature  INT          DEFAULT 706,
+    registreCycleAuto    INT          DEFAULT 704,
+    frequenceLecture     INT          DEFAULT 3,
+    colonneEnabled       BOOLEAN      DEFAULT TRUE,
+    coilRouge            INT          DEFAULT 702,
+    coilOrange           INT          DEFAULT 701,
+    coilVert             INT          DEFAULT 703,
+    heartbeatEnabled     BOOLEAN      DEFAULT TRUE,
+    registreHeartbeat    INT          DEFAULT 700,
+    heartbeatFreq        INT          DEFAULT 5000,
+    createdAt            DATETIME     NOT NULL,
+    updatedAt            DATETIME     NOT NULL,
+    PRIMARY KEY (id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+  COMMENT='Configuration dynamique du système de supervision';
+
+-- Seed : configuration par défaut (uniquement si vide)
+INSERT INTO configs (id, modbusIp, modbusPort, registreTemperature, registreCycleAuto, frequenceLecture, createdAt, updatedAt)
+SELECT 1, '172.16.1.24', 502, 706, 704, 3, NOW(), NOW()
+WHERE NOT EXISTS (SELECT 1 FROM configs LIMIT 1);
