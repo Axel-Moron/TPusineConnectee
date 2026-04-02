@@ -17,6 +17,7 @@
   Communication : API REST (fetch) avec rafraîchissement toutes les 2 secondes
   =============================================================================
 -->
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -25,17 +26,19 @@
     <!-- Chart.js pour les graphiques temps réel -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <!-- Adaptateur date pour l'axe temporel des graphiques -->
-    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
+    <script
+        src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
 </head>
+
 <body>
     <!-- ====== BARRE LATÉRALE DE NAVIGATION ====== -->
     <aside class="sidebar">
         <div class="sidebar-logo">
             <div class="logo-icon">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M12 2L2 7l10 5 10-5-10-5z"/>
-                    <path d="M2 17l10 5 10-5"/>
-                    <path d="M2 12l10 5 10-5"/>
+                    <path d="M12 2L2 7l10 5 10-5-10-5z" />
+                    <path d="M2 17l10 5 10-5" />
+                    <path d="M2 12l10 5 10-5" />
                 </svg>
             </div>
             <span class="logo-text">SUPERVISION</span>
@@ -76,7 +79,8 @@
             </div>
             <div class="topbar-right">
                 <!-- Bouton Mode Jour/Nuit -->
-                <button class="theme-toggle-btn" id="theme-toggle" onclick="toggleTheme()" title="Mode jour/nuit">&#9790;</button>
+                <button class="theme-toggle-btn" id="theme-toggle" onclick="toggleTheme()"
+                    title="Mode jour/nuit">&#9790;</button>
                 <!-- Badge de connexion au backend -->
                 <div class="status-badge" id="badge-connexion">
                     <span class="badge-dot"></span>
@@ -86,7 +90,8 @@
                 <div class="mode-toggle">
                     <span class="mode-label" id="mode-label" style="color: #51cf66;">MODBUS RÉEL</span>
                     <label class="switch">
-                        <input type="checkbox" id="mode-switch" onchange="toggleMode()" title="Basculer mode simulation/réel">
+                        <input type="checkbox" id="mode-switch" onchange="toggleMode()"
+                            title="Basculer mode simulation/réel">
                         <span class="slider"></span>
                     </label>
                 </div>
@@ -310,8 +315,10 @@
                 </table>
                 <!-- Pagination -->
                 <div id="alarmes-pagination" style="display:flex;gap:12px;justify-content:center;margin-top:16px;">
-                    <button class="btn-export" id="btn-alarmes-prev" onclick="alarmesPaginer(-1)" style="display:none;">◀ Précédentes</button>
-                    <button class="btn-export" id="btn-alarmes-next" onclick="alarmesPaginer(1)"  style="display:none;">Suivantes ▶</button>
+                    <button class="btn-export" id="btn-alarmes-prev" onclick="alarmesPaginer(-1)"
+                        style="display:none;">◀ Précédentes</button>
+                    <button class="btn-export" id="btn-alarmes-next" onclick="alarmesPaginer(1)"
+                        style="display:none;">Suivantes ▶</button>
                 </div>
             </div>
         </main>
@@ -326,7 +333,8 @@
                 <span class="param-arch-icon">&#9432;</span>
                 <span>
                     <strong>Architecture :</strong> Le PC lit les données depuis l'automate API M580
-                    (<code id="ip-architecture">172.16.1.24</code>) via <strong>Modbus TCP</strong>. L'automate récupère la
+                    (<code id="ip-architecture">172.16.1.24</code>) via <strong>Modbus TCP</strong>. L'automate récupère
+                    la
                     température depuis la passerelle Banner via son service Modbus DTM.
                     Le PC doit être connecté au <strong>wifi API</strong>.
                 </span>
@@ -364,7 +372,8 @@
                         </div>
 
                         <div class="param-btn-row">
-                            <button class="btn-settings" onclick="sauverParametresModbus()">&#10003; Appliquer la connexion</button>
+                            <button class="btn-settings" onclick="sauverParametresModbus()">&#10003; Appliquer la
+                                connexion</button>
                             <div class="settings-feedback" id="feedback-modbus"></div>
                         </div>
                     </div>
@@ -376,7 +385,7 @@
                         <div class="setting-row">
                             <label for="cfg-reg-temp">
                                 Température
-                                <span class="param-hint">%MF706 — float 32 bits FC03</span>
+                                <span class="param-hint"> float 32 bits FC03</span>
                             </label>
                             <input type="number" id="cfg-reg-temp" placeholder="706">
                         </div>
@@ -384,7 +393,7 @@
                         <div class="setting-row">
                             <label for="cfg-reg-cycle">
                                 Cycle Auto Zone 3
-                                <span class="param-hint">%M704 — coil FC01, true = LANCÉ</span>
+                                <span class="param-hint">coil FC01, true = LANCÉ</span>
                             </label>
                             <input type="number" id="cfg-reg-cycle" placeholder="704">
                         </div>
@@ -398,7 +407,8 @@
                         </div>
 
                         <div class="param-btn-row">
-                            <button class="btn-settings" onclick="sauverParametresRegistres()">&#10003; Appliquer les registres</button>
+                            <button class="btn-settings" onclick="sauverParametresRegistres()">&#10003; Appliquer les
+                                registres</button>
                             <div class="settings-feedback" id="feedback-registres"></div>
                         </div>
                     </div>
@@ -417,7 +427,8 @@
                             <p>Recopie des voyants vers l'armoire API (écriture coils FC05)</p>
                         </div>
                         <label class="switch switch-sm" style="margin-left:auto;">
-                            <input type="checkbox" id="cfg-colonne-enabled" title="Activer colonne lumineuse" checked onchange="toggleColonneConfig()">
+                            <input type="checkbox" id="cfg-colonne-enabled" title="Activer colonne lumineuse" checked
+                                onchange="toggleColonneConfig()">
                             <span class="slider"></span>
                         </label>
                     </div>
@@ -440,7 +451,8 @@
                                 <input type="number" id="cfg-coil-vert" placeholder="703">
                             </div>
                         </div>
-                        <div class="param-note">Actif uniquement en <strong>mode réel</strong> — désactivé en simulation.</div>
+                        <div class="param-note">Actif uniquement en <strong>mode réel</strong> — désactivé en
+                            simulation.</div>
                     </div>
 
                     <div class="param-btn-row">
@@ -458,7 +470,8 @@
                             <p>Signal de présence vers l'automate (bascule 0/1)</p>
                         </div>
                         <label class="switch switch-sm" style="margin-left:auto;">
-                            <input type="checkbox" id="cfg-heartbeat-enabled" title="Activer heartbeat" checked onchange="toggleHeartbeatConfig()">
+                            <input type="checkbox" id="cfg-heartbeat-enabled" title="Activer heartbeat" checked
+                                onchange="toggleHeartbeatConfig()">
                             <span class="slider"></span>
                         </label>
                     </div>
@@ -480,7 +493,8 @@
                             <input type="number" id="cfg-heartbeat-freq" min="100" max="10000" placeholder="1000">
                         </div>
 
-                        <div class="param-note">L'automate détecte une absence de supervision si le heartbeat s'arrête.</div>
+                        <div class="param-note">L'automate détecte une absence de supervision si le heartbeat s'arrête.
+                        </div>
                     </div>
 
                     <div class="param-btn-row">
@@ -867,7 +881,7 @@
             let values = [];
             let currentTemp = 0;
             let lastTime = new Date();
-            
+
             if (data && data.length > 0) {
                 labels = data.map(d => new Date(d.timestamp));
                 values = data.map(d => d.temperature);
@@ -936,7 +950,7 @@
                 // On crée 2 points : le point actuel, et le point dans le futur
                 const futureTime = new Date(lastTime.getTime() + currentPrediction.tempsEstime * 1000);
                 const futureTemp = currentTemp + currentPrediction.pente * currentPrediction.tempsEstime;
-                
+
                 // Uniquement deux points dans ce dataset pour faire un segment de droite
                 datasets.push({
                     label: 'Prédiction',
@@ -948,7 +962,7 @@
                     pointBackgroundColor: '#ffdd57',
                     fill: false
                 });
-                
+
                 // Ajouter le point futur (ceci allonge l'axe X)
                 labels.push(futureTime);
                 datasets.forEach((ds, i) => {
@@ -1023,10 +1037,10 @@
                         labels: mesures.map(d => new Date(d.timestamp)),
                         datasets: [
                             { label: 'Température', data: mesures.map(d => d.temperature), borderColor: '#339af0', backgroundColor: 'rgba(51,154,240,0.1)', borderWidth: 2, pointRadius: 0, fill: true, tension: 0.3 },
-                            { label: 'Seuil Très Haut', data: new Array(mesures.length).fill(seuils.tres_haut), borderColor: '#ff0000', borderWidth: 1.5, borderDash: [5,5], pointRadius: 0, fill: false },
-                            { label: 'Seuil Haut', data: new Array(mesures.length).fill(seuils.haut), borderColor: '#ff6b6b', borderWidth: 1, borderDash: [3,3], pointRadius: 0, fill: false },
-                            { label: 'Seuil Bas', data: new Array(mesures.length).fill(seuils.bas), borderColor: '#51cf66', borderWidth: 1, borderDash: [3,3], pointRadius: 0, fill: false },
-                            { label: 'Seuil Très Bas', data: new Array(mesures.length).fill(seuils.tres_bas), borderColor: '#0000ff', borderWidth: 1.5, borderDash: [5,5], pointRadius: 0, fill: false }
+                            { label: 'Seuil Très Haut', data: new Array(mesures.length).fill(seuils.tres_haut), borderColor: '#ff0000', borderWidth: 1.5, borderDash: [5, 5], pointRadius: 0, fill: false },
+                            { label: 'Seuil Haut', data: new Array(mesures.length).fill(seuils.haut), borderColor: '#ff6b6b', borderWidth: 1, borderDash: [3, 3], pointRadius: 0, fill: false },
+                            { label: 'Seuil Bas', data: new Array(mesures.length).fill(seuils.bas), borderColor: '#51cf66', borderWidth: 1, borderDash: [3, 3], pointRadius: 0, fill: false },
+                            { label: 'Seuil Très Bas', data: new Array(mesures.length).fill(seuils.tres_bas), borderColor: '#0000ff', borderWidth: 1.5, borderDash: [5, 5], pointRadius: 0, fill: false }
                         ]
                     },
                     options: {
@@ -1058,7 +1072,7 @@
                 const tbody = document.getElementById('tbody-seuils-hist');
                 tbody.innerHTML = '';
                 data.forEach(s => {
-                    const d = new Date(s.timestamp);
+                    const d = new Date(s.temps);
                     tbody.innerHTML += `<tr>
                         <td>${d.toLocaleString('fr-FR')}</td>
                         <td class="val-th">${s.tres_haut}°C</td>
@@ -1106,7 +1120,7 @@
 
                 // Compteur
                 const debut = offset + 1;
-                const fin   = Math.min(offset + ALARMES_PAGE_SIZE, data.total);
+                const fin = Math.min(offset + ALARMES_PAGE_SIZE, data.total);
                 document.getElementById('alarmes-compteur').textContent =
                     data.total === 0 ? 'Aucune alarme' : `${debut}–${fin} sur ${data.total}`;
 
@@ -1155,7 +1169,7 @@
             try {
                 const res = await fetch(`${API_URL}/config`);
                 const cfg = await res.json();
-                
+
                 // Maj affichage Architecture
                 if (cfg.modbusIp) document.getElementById('ip-architecture').textContent = cfg.modbusIp;
 
@@ -1302,4 +1316,5 @@
         chargerParametres();                           // Charger la config Modbus
     </script>
 </body>
+
 </html>
