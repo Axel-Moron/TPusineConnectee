@@ -18,7 +18,7 @@ services:
       - db_data:/var/lib/mysql
       - ./init.sql:/docker-entrypoint-initdb.d/init.sql:ro   # Initialisation des tables au premier démarrage
     ports:
-      - "3307:3306"             # Ouvert sur 3307 pour ne pas entrer en conflit avec un MariaDB local
+      - "6778:3306"             # Port MariaDB exposé sur l'hôte
     healthcheck:
       test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
       interval: 10s
@@ -35,7 +35,7 @@ services:
       db:
         condition: service_healthy    # Attend que MariaDB soit prêt avant de démarrer
     ports:
-      - "3000:3000"            # Port d'accès à l'application web
+      - "6777:3000"            # Port d'accès à l'application web
     env_file: .env
     environment:
       - DB_HOST=db             # Utilise le service 'db' interne au réseau Docker

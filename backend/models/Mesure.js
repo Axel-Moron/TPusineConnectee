@@ -1,15 +1,15 @@
 // =============================================================================
-// Modèle Mesure - Stockage des mesures par cycle de lecture
+// Modèle Mesure - Stockage des mesures par capteur et par cycle de lecture
 //
-// Chaque enregistrement correspond à UN cycle de lecture Modbus complet :
-//   - temperature  : valeur °C lue sur le capteur Banner (float %MF706)
-//   - cycle_auto   : état TOR du cycle automatique Zone 3 (%MW704)
-//   - timestamp    : horodatage de la lecture
+// Chaque enregistrement = 1 valeur lue pour 1 capteur à 1 instant donné.
+//   id_capteur=1 → Température Zone 3 (°C, float)
+//   id_capteur=2 → Cycle Auto Zone 3  (TOR : 1=LANCÉ, 0=ARRÊTÉ)
 //
-// Structure : 1 ligne = 1 cycle (température + état cycle auto ensemble)
+// Relation : MESURES N→1 CAPTEURS
 // =============================================================================
 import { DataTypes } from "sequelize";
 import sequelize from "../config/db.js";
+import Capteur from "./Capteur.js";
 
 const Mesure = sequelize.define("Mesure", {
     id: {
@@ -17,20 +17,21 @@ const Mesure = sequelize.define("Mesure", {
         autoIncrement: true,
         primaryKey: true
     },
-    // Température mesurée en °C (null si lecture Modbus échouée ce cycle)
-    temperature: {
+    // Valeur mesurée : °C pour température, 0/1 pour cycle auto
+    valeur: {
         type: DataTypes.FLOAT,
-        allowNull: true,
-        comment: "Température mesurée en °C (capteur Banner via %MF706)"
+        allowNull: false,
+        comment: "Valeur mesurée (°C pour température, 0/1 pour TOR cycle auto)"
     },
-    // État TOR du cycle automatique Zone 3 : 1=LANCÉ, 0=ARRÊTÉ (null si erreur)
-    cycle_auto: {
-        type: DataTypes.TINYINT(1),
-        allowNull: true,
-        comment: "État TOR cycle auto Zone 3 : 1=LANCÉ, 0=ARRÊTÉ (%MW704)"
+    // Clé étrangère vers la table capteurs
+    id_capteur: {
+        type: DataTypes.INTEGER,
+        allowNull: false,
+        references: { model: 'capteurs', key: 'id' },
+        comment: "Capteur source de la mesure (FK → capteurs.id)"
     },
-    // Horodatage de la lecture
-    timestamp: {
+    // Horodatage de la lecture Modbus
+    temps: {
         type: DataTypes.DATE,
         defaultValue: DataTypes.NOW,
         comment: "Date et heure de la lecture Modbus"
@@ -39,5 +40,9 @@ const Mesure = sequelize.define("Mesure", {
     tableName: "mesures",
     timestamps: false
 });
+
+// Association N→1 : une mesure appartient à un capteur
+Mesure.belongsTo(Capteur, { foreignKey: 'id_capteur', as: 'capteur' });
+Capteur.hasMany(Mesure,   { foreignKey: 'id_capteur', as: 'mesures' });
 
 export default Mesure;

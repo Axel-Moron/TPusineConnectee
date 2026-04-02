@@ -292,7 +292,8 @@
             <div class="card" style="padding: 24px;">
                 <div class="card-header">
                     <h2>Journal des alarmes</h2>
-                    <button class="btn-export" onclick="chargerAlarmesPage()">Rafraîchir</button>
+                    <span id="alarmes-compteur" style="color:#868e96;font-size:0.85rem;"></span>
+                    <button class="btn-export" onclick="chargerAlarmesPage(0)">Rafraîchir</button>
                 </div>
                 <table class="data-table" id="table-alarmes">
                     <thead>
@@ -302,10 +303,16 @@
                             <th>Niveau</th>
                             <th>Message</th>
                             <th>Température</th>
+                            <th>Action</th>
                         </tr>
                     </thead>
                     <tbody id="tbody-alarmes"></tbody>
                 </table>
+                <!-- Pagination -->
+                <div id="alarmes-pagination" style="display:flex;gap:12px;justify-content:center;margin-top:16px;">
+                    <button class="btn-export" id="btn-alarmes-prev" onclick="alarmesPaginer(-1)" style="display:none;">◀ Précédentes</button>
+                    <button class="btn-export" id="btn-alarmes-next" onclick="alarmesPaginer(1)"  style="display:none;">Suivantes ▶</button>
+                </div>
             </div>
         </main>
 
@@ -313,127 +320,175 @@
         <!-- SECTION PARAMÈTRES                                            -->
         <!-- ============================================================ -->
         <main class="page-content hidden" id="section-parametres">
-            <div class="info-box" style="margin-bottom: 20px;">
-                <strong>Architecture du système :</strong> Le PC lit les données depuis l'automate API M580 (172.16.1.24)
-                via Modbus TCP. L'automate récupère la température depuis la passerelle Banner
-                via son service Modbus DTM. Le PC doit être connecté au <strong>wifi API</strong> pour communiquer.
+
+            <!-- Bandeau architecture -->
+            <div class="param-arch-banner">
+                <span class="param-arch-icon">&#9432;</span>
+                <span>
+                    <strong>Architecture :</strong> Le PC lit les données depuis l'automate API M580
+                    (<code>172.16.1.24</code>) via <strong>Modbus TCP</strong>. L'automate récupère la
+                    température depuis la passerelle Banner via son service Modbus DTM.
+                    Le PC doit être connecté au <strong>wifi API</strong>.
+                </span>
             </div>
 
-            <div class="settings-grid">
-                <!-- Paramètres Communication Modbus -->
-                <div class="card settings-section">
-                    <h3>&#128225; Communication Modbus TCP</h3>
-
-                    <div class="setting-row">
-                        <label for="cfg-modbus-ip">IP Automate (API M580)</label>
-                        <input type="text" id="cfg-modbus-ip" value="172.16.1.24" placeholder="172.16.1.24" title="Adresse IP de l'automate M580">
+            <!-- ── Bloc 1 : Configuration Modbus (pleine largeur) ── -->
+            <div class="param-block">
+                <div class="param-block-header">
+                    <span class="param-block-icon">&#128225;</span>
+                    <div>
+                        <h3>Configuration Modbus TCP</h3>
+                        <p>Adresse de l'automate, registres et fréquence de lecture</p>
                     </div>
-
-                    <div class="setting-row">
-                        <label for="cfg-modbus-port">Port Modbus TCP</label>
-                        <input type="number" id="cfg-modbus-port" value="502" placeholder="502" title="Port TCP">
-                    </div>
-
-                    <button class="btn-settings" onclick="sauverParametresModbus()">Appliquer</button>
-                    <div class="settings-feedback" id="feedback-modbus"></div>
                 </div>
 
-                <!-- Paramètres Registres -->
-                <div class="card settings-section">
-                    <h3>&#128203; Registres Modbus</h3>
+                <div class="param-two-col">
+                    <!-- Colonne gauche : Communication -->
+                    <div class="param-subsection">
+                        <div class="param-subsection-title">Connexion</div>
 
-                    <div class="setting-row">
-                        <label for="cfg-reg-temp">Registre temp. (%MW)</label>
-                        <input type="number" id="cfg-reg-temp" value="706" title="Registre de température" placeholder="706">
+                        <div class="setting-row">
+                            <label for="cfg-modbus-ip">
+                                IP Automate
+                                <span class="param-hint">API M580</span>
+                            </label>
+                            <input type="text" id="cfg-modbus-ip" value="172.16.1.24" placeholder="172.16.1.24">
+                        </div>
+
+                        <div class="setting-row">
+                            <label for="cfg-modbus-port">
+                                Port TCP
+                                <span class="param-hint">Standard Modbus : 502</span>
+                            </label>
+                            <input type="number" id="cfg-modbus-port" value="502" placeholder="502">
+                        </div>
+
+                        <div class="param-btn-row">
+                            <button class="btn-settings" onclick="sauverParametresModbus()">&#10003; Appliquer la connexion</button>
+                            <div class="settings-feedback" id="feedback-modbus"></div>
+                        </div>
                     </div>
 
-                    <div class="setting-row">
-                        <label for="cfg-reg-cycle">Registre Cycle Auto (%M)</label>
-                        <input type="number" id="cfg-reg-cycle" value="640" title="Registre cycle auto" placeholder="640">
-                    </div>
+                    <!-- Colonne droite : Registres -->
+                    <div class="param-subsection">
+                        <div class="param-subsection-title">Registres &amp; Fréquence</div>
 
-                    <div class="setting-row">
-                        <label for="cfg-frequence">Fréquence de lecture (sec)</label>
-                        <input type="number" id="cfg-frequence" value="3" min="1" max="60" title="Fréquence" placeholder="3">
-                    </div>
+                        <div class="setting-row">
+                            <label for="cfg-reg-temp">
+                                Température
+                                <span class="param-hint">%MF706 — float 32 bits FC03</span>
+                            </label>
+                            <input type="number" id="cfg-reg-temp" value="706" placeholder="706">
+                        </div>
 
-                    <button class="btn-settings" onclick="sauverParametresRegistres()">Appliquer</button>
-                    <div class="settings-feedback" id="feedback-registres"></div>
+                        <div class="setting-row">
+                            <label for="cfg-reg-cycle">
+                                Cycle Auto Zone 3
+                                <span class="param-hint">%MW704 — holding FC03, ≠0 = LANCÉ</span>
+                            </label>
+                            <input type="number" id="cfg-reg-cycle" value="704" placeholder="704">
+                        </div>
+
+                        <div class="setting-row">
+                            <label for="cfg-frequence">
+                                Fréquence de lecture
+                                <span class="param-hint">Secondes (1 – 60)</span>
+                            </label>
+                            <input type="number" id="cfg-frequence" value="3" min="1" max="60" placeholder="3">
+                        </div>
+
+                        <div class="param-btn-row">
+                            <button class="btn-settings" onclick="sauverParametresRegistres()">&#10003; Appliquer les registres</button>
+                            <div class="settings-feedback" id="feedback-registres"></div>
+                        </div>
+                    </div>
                 </div>
+            </div>
 
-                <!-- Recopie Colonne Lumineuse vers armoire API -->
-                <div class="card settings-section">
-                    <h3>&#128161; Recopie Colonne Lumineuse</h3>
+            <!-- ── Bloc 2 : Sorties (Colonne lumineuse + Heartbeat) ── -->
+            <div class="param-two-col" style="margin-top:0;">
 
-                    <div class="info-box">
-                        <strong>Recopie vers l'armoire :</strong> Les voyants de la page principale
-                        (rouge, orange, vert) sont recopiés vers la colonne lumineuse physique
-                        de l'armoire API via écriture de coils (FC05).
-                        Actif uniquement en <strong>mode réel</strong> (désactivé en simulation).
-                    </div>
-
-                    <div class="setting-row">
-                        <label for="cfg-colonne-enabled">Activer la recopie</label>
-                        <label class="switch switch-sm">
-                            <input type="checkbox" id="cfg-colonne-enabled" checked onchange="toggleColonneConfig()" title="Activer recopie">
+                <!-- Colonne lumineuse -->
+                <div class="param-block">
+                    <div class="param-block-header">
+                        <span class="param-block-icon">&#128161;</span>
+                        <div>
+                            <h3>Colonne Lumineuse</h3>
+                            <p>Recopie des voyants vers l'armoire API (écriture coils FC05)</p>
+                        </div>
+                        <label class="switch switch-sm" style="margin-left:auto;">
+                            <input type="checkbox" id="cfg-colonne-enabled" checked onchange="toggleColonneConfig()">
                             <span class="slider"></span>
                         </label>
                     </div>
 
                     <div id="colonne-config-fields">
-                        <div class="setting-row">
-                            <label for="cfg-coil-rouge">Coil voyant rouge (%M)</label>
-                            <input type="number" id="cfg-coil-rouge" value="702" placeholder="Ex: 702" title="Coil rouge">
+                        <div class="param-voyants-grid">
+                            <div class="param-voyant-row rouge">
+                                <span class="param-voyant-dot"></span>
+                                <label for="cfg-coil-rouge">Rouge (%M)</label>
+                                <input type="number" id="cfg-coil-rouge" value="702" placeholder="702">
+                            </div>
+                            <div class="param-voyant-row orange">
+                                <span class="param-voyant-dot"></span>
+                                <label for="cfg-coil-orange">Orange (%M)</label>
+                                <input type="number" id="cfg-coil-orange" value="701" placeholder="701">
+                            </div>
+                            <div class="param-voyant-row vert">
+                                <span class="param-voyant-dot"></span>
+                                <label for="cfg-coil-vert">Vert (%M)</label>
+                                <input type="number" id="cfg-coil-vert" value="703" placeholder="703">
+                            </div>
                         </div>
-
-                        <div class="setting-row">
-                            <label for="cfg-coil-orange">Coil voyant orange (%M)</label>
-                            <input type="number" id="cfg-coil-orange" value="701" placeholder="Ex: 701" title="Coil orange">
-                        </div>
-
-                        <div class="setting-row">
-                            <label for="cfg-coil-vert">Coil voyant vert (%M)</label>
-                            <input type="number" id="cfg-coil-vert" value="703" placeholder="Ex: 703" title="Coil vert">
-                        </div>
+                        <div class="param-note">Actif uniquement en <strong>mode réel</strong> — désactivé en simulation.</div>
                     </div>
 
-                    <button class="btn-settings" onclick="sauverParametresColonne()">Appliquer</button>
-                    <div class="settings-feedback" id="feedback-colonne"></div>
+                    <div class="param-btn-row">
+                        <button class="btn-settings" onclick="sauverParametresColonne()">&#10003; Appliquer</button>
+                        <div class="settings-feedback" id="feedback-colonne"></div>
+                    </div>
                 </div>
 
-                <!-- Heartbeat vers l'automate -->
-                <div class="card settings-section">
-                    <h3>&#128147; Heartbeat</h3>
-
-                    <div class="info-box">
-                        <strong>Signal de présence :</strong> Le PC écrit périodiquement sur un coil
-                        de l'automate (%M700) pour signaler qu'il est actif.
-                        La valeur bascule entre 0 et 1 à la fréquence configurée.
-                    </div>
-
-                    <div class="setting-row">
-                        <label for="cfg-heartbeat-enabled">Activer le heartbeat</label>
-                        <label class="switch switch-sm">
-                            <input type="checkbox" id="cfg-heartbeat-enabled" checked onchange="toggleHeartbeatConfig()" title="Activer heartbeat">
+                <!-- Heartbeat -->
+                <div class="param-block">
+                    <div class="param-block-header">
+                        <span class="param-block-icon">&#128147;</span>
+                        <div>
+                            <h3>Heartbeat</h3>
+                            <p>Signal de présence vers l'automate (bascule 0/1)</p>
+                        </div>
+                        <label class="switch switch-sm" style="margin-left:auto;">
+                            <input type="checkbox" id="cfg-heartbeat-enabled" checked onchange="toggleHeartbeatConfig()">
                             <span class="slider"></span>
                         </label>
                     </div>
 
                     <div id="heartbeat-config-fields">
                         <div class="setting-row">
-                            <label for="cfg-reg-heartbeat">Coil heartbeat (%M)</label>
-                            <input type="number" id="cfg-reg-heartbeat" value="700" placeholder="Ex: 700" title="Coil heartbeat">
+                            <label for="cfg-reg-heartbeat">
+                                Coil heartbeat
+                                <span class="param-hint">%M700 par défaut</span>
+                            </label>
+                            <input type="number" id="cfg-reg-heartbeat" value="700" placeholder="700">
                         </div>
 
                         <div class="setting-row">
-                            <label for="cfg-heartbeat-freq">Période (ms)</label>
-                            <input type="number" id="cfg-heartbeat-freq" value="1000" min="100" max="10000" placeholder="1000" title="Fréquence heartbeat">
+                            <label for="cfg-heartbeat-freq">
+                                Période
+                                <span class="param-hint">Millisecondes (100 – 10 000)</span>
+                            </label>
+                            <input type="number" id="cfg-heartbeat-freq" value="1000" min="100" max="10000" placeholder="1000">
                         </div>
+
+                        <div class="param-note">L'automate détecte une absence de supervision si le heartbeat s'arrête.</div>
                     </div>
 
-                    <button class="btn-settings" onclick="sauverParametresHeartbeat()">Appliquer</button>
-                    <div class="settings-feedback" id="feedback-heartbeat"></div>
+                    <div class="param-btn-row">
+                        <button class="btn-settings" onclick="sauverParametresHeartbeat()">&#10003; Appliquer</button>
+                        <div class="settings-feedback" id="feedback-heartbeat"></div>
+                    </div>
                 </div>
+
             </div>
         </main>
     </div>
@@ -482,7 +537,7 @@
                 document.getElementById('hist-start').value = hier.toISOString().slice(0, 16);
             }
             if (sectionId === 'alarmes-page') {
-                chargerAlarmesPage();
+                chargerAlarmesPage(0);
             }
         }
 
@@ -969,25 +1024,66 @@
         }
 
         // =====================================================================
-        // Page Alarmes (journal)
+        // Page Alarmes (journal) — 20 par page, suppression, pagination
         // =====================================================================
-        async function chargerAlarmesPage() {
+        let alarmesOffset = 0;
+        const ALARMES_PAGE_SIZE = 20;
+
+        async function chargerAlarmesPage(offset = 0) {
+            alarmesOffset = offset;
             try {
-                const res = await fetch(`${API_URL}/alarmes?limit=200`);
+                const res = await fetch(`${API_URL}/alarmes?limit=${ALARMES_PAGE_SIZE}&offset=${offset}`);
                 const data = await res.json();
                 const tbody = document.getElementById('tbody-alarmes');
                 tbody.innerHTML = '';
-                data.forEach(a => {
+
+                data.alarmes.forEach(a => {
                     const d = new Date(a.timestamp);
                     const typeClass = a.type_evenement === 'declenchement' ? 'type-decl' : 'type-disp';
-                    tbody.innerHTML += `<tr>
+                    const niveauLabel = a.niveau.replace(/_/g, ' ').toUpperCase();
+                    tbody.innerHTML += `<tr id="alarme-row-${a.id}">
                         <td>${d.toLocaleString('fr-FR')}</td>
                         <td class="${typeClass}">${a.type_evenement}</td>
-                        <td>${a.niveau}</td>
+                        <td>${niveauLabel}</td>
                         <td>${a.message}</td>
                         <td>${a.temperature !== null ? a.temperature.toFixed(1) + '°C' : '--'}</td>
+                        <td>
+                            <button onclick="supprimerAlarme(${a.id})"
+                                style="background:#c92a2a;color:#fff;border:none;border-radius:4px;
+                                       padding:3px 10px;cursor:pointer;font-size:0.8rem;">
+                                Supprimer
+                            </button>
+                        </td>
                     </tr>`;
                 });
+
+                // Compteur
+                const debut = offset + 1;
+                const fin   = Math.min(offset + ALARMES_PAGE_SIZE, data.total);
+                document.getElementById('alarmes-compteur').textContent =
+                    data.total === 0 ? 'Aucune alarme' : `${debut}–${fin} sur ${data.total}`;
+
+                // Boutons pagination
+                document.getElementById('btn-alarmes-prev').style.display = offset > 0 ? 'inline-block' : 'none';
+                document.getElementById('btn-alarmes-next').style.display =
+                    (offset + ALARMES_PAGE_SIZE) < data.total ? 'inline-block' : 'none';
+
+            } catch (e) { console.error(e); }
+        }
+
+        function alarmesPaginer(direction) {
+            chargerAlarmesPage(alarmesOffset + direction * ALARMES_PAGE_SIZE);
+        }
+
+        async function supprimerAlarme(id) {
+            if (!confirm('Supprimer cette alarme ?')) return;
+            try {
+                const res = await fetch(`${API_URL}/alarmes/${id}`, { method: 'DELETE' });
+                if (res.ok) {
+                    document.getElementById(`alarme-row-${id}`)?.remove();
+                    // Recharger la page courante pour mettre à jour le compteur
+                    chargerAlarmesPage(alarmesOffset);
+                }
             } catch (e) { console.error(e); }
         }
 

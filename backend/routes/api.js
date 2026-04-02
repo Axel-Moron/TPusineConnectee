@@ -14,6 +14,7 @@
 // =============================================================================
 import express from "express";
 import { Op } from "sequelize";
+import Capteur from "../models/Capteur.js";
 import Mesure from "../models/Mesure.js";
 import Seuil from "../models/Seuil.js";
 import Alarme from "../models/Alarme.js";
@@ -103,7 +104,7 @@ router.post("/seuils", async (req, res) => {
         setSeuilsActuels(nouveauxSeuils);
 
         // 2. Historisation en base de données
-        await Seuil.create(nouveauxSeuils);
+        await Seuil.create({ ...nouveauxSeuils, id_capteur: 1 });
 
         // 3. Écriture dans le fichier seuils.csv
         appendSeuilCSV(nouveauxSeuils);
@@ -135,22 +136,21 @@ router.post("/seuils", async (req, res) => {
 router.get("/historique", async (req, res) => {
     try {
         const { start, end, limit } = req.query;
-        const whereClause = { temperature: { [Op.not]: null } };  // Lignes avec une température
+        const whereClause = { id_capteur: 1 };  // Uniquement les températures (capteur 1)
 
-        // Filtre par période si les dates sont fournies
         if (start && end) {
-            whereClause.timestamp = { [Op.between]: [new Date(start), new Date(end)] };
+            whereClause.temps = { [Op.between]: [new Date(start), new Date(end)] };
         }
 
-        // Récupération des mesures triées chronologiquement
         const mesures = await Mesure.findAll({
             where: whereClause,
-            order: [["timestamp", "ASC"]],
+            order: [["temps", "ASC"]],
             limit: parseInt(limit) || 2000,
-            attributes: ['temperature', 'cycle_auto', 'timestamp']
+            attributes: ['valeur', 'temps']
         });
 
-        res.json(mesures);
+        // Renommer pour compatibilité frontend (valeur → temperature, temps → timestamp)
+        res.json(mesures.map(m => ({ temperature: m.valeur, timestamp: m.temps })));
     } catch (err) {
         console.error("Erreur historique:", err);
         res.status(500).json({ error: err.message });
@@ -163,22 +163,40 @@ router.get("/historique", async (req, res) => {
 // =============================================================================
 router.get("/alarmes", async (req, res) => {
     try {
-        const { start, end, limit } = req.query;
+        const { start, end, limit, offset } = req.query;
         const whereClause = {};
 
         if (start && end) {
-            whereClause.timestamp = {
-                [Op.between]: [new Date(start), new Date(end)]
-            };
+            whereClause.timestamp = { [Op.between]: [new Date(start), new Date(end)] };
         }
 
         const alarmes = await Alarme.findAll({
             where: whereClause,
-            order: [["timestamp", "DESC"]],   // Les plus récentes en premier
-            limit: parseInt(limit) || 100
+            order: [["timestamp", "DESC"]],
+            limit:  parseInt(limit)  || 20,
+            offset: parseInt(offset) || 0
         });
 
-        res.json(alarmes);
+        // Nombre total pour savoir s'il reste des alarmes à charger
+        const total = await Alarme.count({ where: whereClause });
+
+        res.json({ alarmes, total, offset: parseInt(offset) || 0 });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// =============================================================================
+// DELETE /api/alarmes/:id - Supprimer une alarme par son id
+// =============================================================================
+router.delete("/alarmes/:id", async (req, res) => {
+    try {
+        const deleted = await Alarme.destroy({ where: { id: req.params.id } });
+        if (deleted) {
+            res.json({ success: true });
+        } else {
+            res.status(404).json({ error: "Alarme introuvable" });
+        }
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
@@ -216,7 +234,7 @@ router.post("/mode", (req, res) => {
 router.get("/seuils/historique", async (req, res) => {
     try {
         const historique = await Seuil.findAll({
-            order: [["timestamp", "DESC"]],
+            order: [["temps", "DESC"]],
             limit: 50
         });
         res.json(historique);
@@ -231,26 +249,22 @@ router.get("/seuils/historique", async (req, res) => {
 router.get("/export/mesures", async (req, res) => {
     try {
         const { start, end } = req.query;
-        const whereClause = { temperature: { [Op.not]: null } };
+        const whereClause = { id_capteur: 1 };  // Températures uniquement
 
         if (start && end) {
-            whereClause.timestamp = {
-                [Op.between]: [new Date(start), new Date(end)]
-            };
+            whereClause.temps = { [Op.between]: [new Date(start), new Date(end)] };
         }
 
         const mesures = await Mesure.findAll({
             where: whereClause,
-            order: [["timestamp", "ASC"]],
-            attributes: ['temperature', 'cycle_auto', 'timestamp']
+            order: [["temps", "ASC"]],
+            attributes: ['valeur', 'temps']
         });
 
-        // Génération du contenu CSV
-        let csv = "Date;Heure;Temperature_C;Cycle_Auto\r\n";
+        let csv = "Date;Heure;Temperature_C\r\n";
         mesures.forEach(m => {
-            const d = new Date(m.timestamp);
-            const cycleStr = m.cycle_auto === null ? '' : (m.cycle_auto ? 'LANCÉ' : 'ARRÊTÉ');
-            csv += `${d.toLocaleDateString('fr-FR')};${d.toLocaleTimeString('fr-FR')};${m.temperature};${cycleStr}\r\n`;
+            const d = new Date(m.temps);
+            csv += `${d.toLocaleDateString('fr-FR')};${d.toLocaleTimeString('fr-FR')};${m.valeur}\r\n`;
         });
 
         res.header("Content-Type", "text/csv; charset=utf-8");

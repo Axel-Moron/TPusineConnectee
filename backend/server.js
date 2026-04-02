@@ -23,6 +23,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 
 // Import des modèles Sequelize (créent les tables en BDD automatiquement)
+import Capteur from "./models/Capteur.js";
 import Mesure from "./models/Mesure.js";
 import Seuil from "./models/Seuil.js";
 import Alarme from "./models/Alarme.js";
@@ -100,13 +101,18 @@ const startServer = async () => {
 
     // 2. Synchronisation des modèles Sequelize (crée/met à jour les tables)
     await sequelize.sync();
-    console.log("✅ Tables BDD synchronisées (mesures, seuils, alarmes)");
+    console.log("✅ Tables BDD synchronisées (capteurs, mesures, seuil, alarmes)");
 
-    // 3. Initialisation des fichiers CSV
+    // 3. Insertion des capteurs par défaut si absents (seed)
+    await Capteur.findOrCreate({ where: { id: 1 }, defaults: { designation: 'Température Zone 3' } });
+    await Capteur.findOrCreate({ where: { id: 2 }, defaults: { designation: 'Cycle Auto Zone 3'  } });
+    console.log("✅ Capteurs initialisés (Température Zone 3, Cycle Auto Zone 3)");
+
+    // 4. Initialisation des fichiers CSV
     initCSVFiles();
 
-    // 4. Chargement des derniers seuils depuis la BDD (s'ils existent)
-    const dernierSeuil = await Seuil.findOne({ order: [["timestamp", "DESC"]] });
+    // 5. Chargement des derniers seuils depuis la BDD (s'ils existent)
+    const dernierSeuil = await Seuil.findOne({ order: [["temps", "DESC"]] });
     if (dernierSeuil) {
         const { setSeuilsActuels } = await import("./services/scheduler.js");
         setSeuilsActuels({

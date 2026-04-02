@@ -107,22 +107,16 @@ const executerCycleLecture = async () => {
         const cycleAuto = await readCycleAuto();
 
         // --- 3. Historisation en base de données ---
-        // Un seul enregistrement par cycle : température + cycle_auto ensemble
-        if (temperature !== null || cycleAuto !== null) {
-            await Mesure.create({
-                temperature: temperature,
-                cycle_auto: cycleAuto !== null ? (cycleAuto ? 1 : 0) : null,
-                timestamp: now
-            });
-        }
-
+        // 1 ligne par capteur par cycle : id_capteur=1 (température), id_capteur=2 (cycle auto)
         if (temperature !== null) {
+            await Mesure.create({ valeur: temperature,          id_capteur: 1, temps: now });
             derniereTemperature = temperature;
             dernierTimestamp = now;
             ajouterMesure(temperature, now);
         }
 
         if (cycleAuto !== null) {
+            await Mesure.create({ valeur: cycleAuto ? 1 : 0,   id_capteur: 2, temps: now });
             dernierCycleAuto = cycleAuto;
         }
 

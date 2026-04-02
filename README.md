@@ -6,108 +6,168 @@
 
 ---
 
-## 📋 Contexte & Objectifs du Cahier des Charges
+## 📋 Contexte & Objectifs
 
-Ce projet met en œuvre une carte de contrôle liée à un capteur de température sans fil (Banner QM42VT1 + passerelle DX80N2Q45VT) pour détecter un échauffement anormal dans la Zone 3 de la Mini-Usine.
+Ce projet met en œuvre une application de supervision temps réel liée à un capteur de température sans fil (Banner QM42VT1 + passerelle DX80N2Q45VT) pour détecter un échauffement anormal dans la Zone 3 de la Mini-Usine.
 
-### Fonctionnalités complètes réalisées selon le cahier des charges :
-1. **Lecture Modbus TCP** : Récupération des données depuis l'automate M580 (IP `172.16.1.24`).
-   - Température sur `%MF706` (Lecture Float 32 bits, 2 registres).
-   - "Cycle auto Zone 3 lancé" sur `%M640` (**Logique inversée : `0` = LANCÉ** selon l'énoncé).
-2. **Historisation (Base de données locale MariaDB + CSV)** :
-   - Historisation des températures et état du cycle (`Mesures`).
-   - Historisation des changements de seuils dans la BDD et dans `seuils.csv`.
-   - Historisation des déclenchements d'alarmes dans la BDD et dans `alarmes.csv`.
-3. **Interface Web temps réel** :
-   - Visualisation de l'état du cycle auto.
-   - Courbe dynamique de la température (Highcharts/Chart.js) et affichage numérique.
-   - Configuration dynamique des 4 seuils de détection (Très Haut, Haut, Bas, Très Bas).
-4. **Maintenance Conditionnelle & Alarmes Process** :
-   - Alarme **Niveau critique** : `> Seuil très haut` ➔ Voyant rouge clignotant (`%M702`).
-   - Alarme **Attention** : `> Seuil haut` ➔ Voyant rouge fixe (`%M702`).
-   - Alarme **Attention** : `< Seuil bas` ➔ Voyant vert fixe (`%M703`).
-   - Alarme **Niveau critique** : `< Seuil très bas` ➔ Voyant vert clignotant (`%M703`).
-   - **Plage normale** : Entre Bas et Haut ➔ Aucun message, voyant orange fixe (`%M701`).
-5. **Indicateurs de Maintenance Prédictive** :
-   Calcul en direct de la pente (régression linéaire) pour générer des messages d'alerte anticipés lorsque le cycle auto est lancé :
-   - Risque d'atteinte du seuil (très haut ou très bas) dans X secondes.
-   - Sortie du seuil (haut ou bas) dans X secondes.
-6. **Fichier PowerBI** :
-   Liaison PowerBI configurée sur la base de données `tp2_maintenance_z4` (fichier `.pbix` fourni séparément).
+### Fonctionnalités réalisées
+
+1. **Lecture Modbus TCP** depuis l'automate M580 (`172.16.1.24`) :
+   - Température sur `%MF706` (float 32 bits, 2 registres holding FC03).
+   - Cycle auto Zone 3 sur `%MW704` (holding register FC03 — `0` = ARRÊTÉ, non nul = LANCÉ).
+
+2. **Historisation en base de données MariaDB** (schéma relationnel) :
+   - Table `capteurs` : référentiel des capteurs (température, cycle auto).
+   - Table `mesures` : toutes les valeurs lues, liées à leur capteur (`id_capteur` FK).
+   - Table `seuil` : historique de chaque modification des 4 seuils, liée au capteur température.
+   - Table `alarmes` : journal de tous les déclenchements et disparitions d'alarmes.
+   - Export CSV de traçabilité (`seuils.csv`, `alarmes.csv`).
+
+3. **Interface Web temps réel** (`http://localhost:6777`) :
+   - Affichage numérique et courbe de température (Chart.js).
+   - État du cycle automatique Zone 3.
+   - Colonne lumineuse virtuelle (rouge/orange/vert).
+   - Configuration dynamique des 4 seuils (Très Haut, Haut, Bas, Très Bas).
+   - Journal des alarmes : 20 par page, pagination, suppression individuelle.
+
+4. **Alarmes Process** (4 niveaux) :
+   - `> Seuil très haut` → Voyant rouge clignotant (`%M702`)
+   - `> Seuil haut` → Voyant rouge fixe (`%M702`)
+   - Plage normale → Voyant orange fixe (`%M701`)
+   - `< Seuil bas` → Voyant vert fixe (`%M703`)
+   - `< Seuil très bas` → Voyant vert clignotant (`%M703`)
+
+5. **Maintenance Prédictive** (régression linéaire) :
+   - Estimation du temps avant franchissement d'un seuil critique.
+   - Alerte active si le seuil est déjà dépassé (message + indicateur visuel).
+   - Actif uniquement si le cycle auto est lancé.
+
+6. **Connexion Power BI** :
+   - Connecteur MySQL sur `localhost:6778`, base `tp2_maintenance_z4`.
+   - Tables importables : `capteurs`, `mesures`, `seuil`, `alarmes`.
+   - Relations : `mesures[id_capteur]` → `capteurs[id]`, `seuil[id_capteur]` → `capteurs[id]`.
 
 ---
 
 ## 🛠️ Architecture Technique
 
-- **Backend** : Node.js avec le framework Express.
-- **Protocole Industriel** : `modbus-serial` (Modbus TCP).
-- **Frontend** : HTML5, CSS3, JavaScript Vanilla + API REST.
-- **Base de données** : MariaDB (gérée par `Sequelize` ORM).
+| Couche | Technologie |
+|---|---|
+| Backend | Node.js 18 + Express |
+| ORM | Sequelize 6 (driver `mysql2`) |
+| Base de données | MariaDB 10.6 (conteneur Docker) |
+| Protocole industriel | Modbus TCP (`modbus-serial`) |
+| Frontend | HTML5 / CSS3 / JavaScript Vanilla + Chart.js |
+| Conteneurisation | Docker + Docker Compose |
 
 ---
 
-## 🚀 Installation & Lancement Rapide
+## 🚀 Lancement avec Docker (méthode recommandée)
 
-Vous avez **deux méthodes** pour lancer le projet : avec Docker (recommandé et très simple) ou classiquement sur Windows.
+**Prérequis :** Docker Desktop installé et démarré.
 
-### Méthode 1 : Lancement Automatique avec Docker (Recommandé)
-C'est la méthode idéale si vous ne voulez rien installer à part Docker. La base de données MariaDB est gérée de manière invisible.
+```bash
+# Premier lancement (ou après modification du code)
+docker compose down -v
+docker compose build --no-cache
+docker compose up
 
-1. **Prérequis** : Avoir installé et démarré **Docker Desktop** sur votre machine.
-2. Assurez-vous d'être connecté au **réseau WiFi de l'API** (pour que le logiciel puisse joindre l'automate sur `172.16.1.24`).
-3. Double-cliquez simplement sur le fichier fourni :
-   ▶️ **`LANCER_DOCKER.bat`**
-4. Ouvrez votre navigateur sur : [http://localhost:3000](http://localhost:3000)
+# Relance normale (sans changement de code)
+docker compose up
+```
 
-*(Détail caché : La base de données interne tourne sur le port 3307 au cas où vous auriez déjà une BDD locale sur le port 3306. Si vous utilisez un terminal Linux/Mac : `docker-compose up --build -d`).*
+**Accès :**
+- Application web : [http://localhost:6777](http://localhost:6777)
+- MariaDB (Power BI / DBeaver) : `localhost:6778`
 
-### Méthode 2 : Lancement Classique (Sans Docker)
-Utile si vous préférez utiliser un MariaDB local (ex: XAMPP) et Node.js directement sur Windows :
-
-1. **Prérequis** :
-   - Disposer d'une base MariaDB locale active (port 3306).
-   - Avoir **Node.js** installé.
-   - Être connecté au **réseau WiFi de l'API**.
-
-2. **Configuration BDD** :
-   Modifiez si besoin le fichier `.env` à la racine (par défaut : BDD `tp2_maintenance_z4`, utilisateur `root`, pas de mot de passe).
-
-3. **Démarrage** :
-   Double-cliquez sur le fichier :
-   ▶️ **`LANCER.bat`**
-   *(Ou tapez dans un terminal : `cd backend && npm install && npm start`).*
-
-4. **Accès** : [http://localhost:3000](http://localhost:3000)
+> ⚠️ Le `-v` au premier lancement supprime l'ancien volume pour recréer les tables proprement à partir de `init.sql`.
 
 ---
 
-## ⚙️ Configuration Automate M580 (Paramètres modifiables via le dashboard)
+## ⚙️ Configuration Modbus (automate M580)
 
-| Description | Type Modbus | Adresse | Remarque |
+| Description | Type | Adresse | Remarque |
 |---|---|---|---|
-| **IP de l'automate** | Réseau TCP | `172.16.1.24` | Port 502 |
-| **Température** | Holding Register | `%MW706` | Décodage Little Endian Word Swap (%MF706) |
-| **Cycle Auto Zone 3** | Holding Register | `%MW704` | `0` = Arrêté, non nul / positif = Lancé |
-| **Voyant Rouge** | Coil / Bit | `%M702` | Clignote si alarme très haute, fixe si alarme haute |
-| **Voyant Orange** | Coil / Bit | `%M701` | Fixe si plage normale |
-| **Voyant Vert** | Coil / Bit | `%M703` | Clignote si alarme très basse, fixe si alarme basse |
-| **Heartbeat (optionnel)**| Coil / Bit | `%M700` | Bascule à 1Hz pour signaler à l'API que la supervision est active |
+| IP de l'automate | TCP | `172.16.1.24:502` | Réseau WiFi API |
+| Température | Holding Register FC03 | `%MF706` (MW706+MW707) | Float 32 bits, Little Endian Word Swap |
+| Cycle Auto Zone 3 | Holding Register FC03 | `%MW704` | 0 = ARRÊTÉ, ≠0 = LANCÉ |
+| Voyant Rouge | Coil FC05 | `%M702` | Clignotant = très haut, fixe = haut |
+| Voyant Orange | Coil FC05 | `%M701` | Fixe = plage normale |
+| Voyant Vert | Coil FC05 | `%M703` | Clignotant = très bas, fixe = bas |
+| Heartbeat | Coil FC05 | `%M700` | Bascule 1 Hz — signale la présence de la supervision |
+
+---
+
+## 🗄️ Schéma de la base de données
+
+```
+capteurs (id, designation)
+    │                  │
+    ▼                  ▼
+mesures              seuil
+(id,                 (id,
+ valeur,              tres_haut, haut,
+ id_capteur FK,       bas, tres_bas,
+ temps)               id_capteur FK,
+                      temps)
+
+alarmes  [indépendante]
+(id, type_evenement, niveau, message, temperature, timestamp)
+```
+
+**Capteurs seedés au démarrage :**
+- `id=1` → Température Zone 3
+- `id=2` → Cycle Auto Zone 3
 
 ---
 
 ## 📂 Organisation du code
 
-```text
-/
-├── backend/
-│   ├── config/       # Connexion à la base de données
-│   ├── models/       # Tables BDD (Mesures, Seuils, Alarmes)
-│   ├── routes/       # API REST pour le Frontend
-│   └── services/     # Logiques Modbus, Prédictif, Alarmes, CSV
-│
-├── frontend/         # Dashboard Web (index.html, styles.css)
-│
-├── .env.example      # Template des variables d'environnement
-├── README.md         # Ce document !
-└── setup.sql         # Script optionnel de création de compte SQL
 ```
+tp2-moron-axel/
+├── backend/
+│   ├── config/
+│   │   └── db.js               # Connexion Sequelize (mysql2)
+│   ├── models/
+│   │   ├── Capteur.js           # Table capteurs
+│   │   ├── Mesure.js            # Table mesures (FK → capteurs)
+│   │   ├── Seuil.js             # Table seuil   (FK → capteurs)
+│   │   └── Alarme.js            # Table alarmes
+│   ├── routes/
+│   │   └── api.js               # Endpoints REST (GET, POST, DELETE)
+│   ├── services/
+│   │   ├── modbusService.js     # Lecture/écriture Modbus TCP
+│   │   ├── scheduler.js         # Cycle de lecture périodique (cron)
+│   │   ├── alarmService.js      # Évaluation des alarmes
+│   │   ├── predictiveService.js # Régression linéaire prédictive
+│   │   └── csvService.js        # Export CSV traçabilité
+│   ├── Dockerfile
+│   ├── server.js                # Point d'entrée Express
+│   └── package.json
+├── frontend/
+│   ├── index.html               # Dashboard web complet
+│   └── style.css
+├── init.sql                     # Initialisation BDD au premier démarrage
+├── docker-compose.yml           # Orchestration des conteneurs
+├── .env                         # Variables d'environnement (ne pas commiter)
+├── .env.example                 # Template des variables
+└── README.md
+```
+
+---
+
+## 🔌 Variables d'environnement (`.env`)
+
+| Variable | Valeur par défaut | Description |
+|---|---|---|
+| `PORT` | `3000` | Port interne du serveur Node.js |
+| `DB_HOST` | `db` | Hôte MariaDB (nom du service Docker) |
+| `DB_PORT` | `3306` | Port interne MariaDB |
+| `DB_USER` | `root` | Utilisateur MariaDB |
+| `DB_PASSWORD` | `root` | Mot de passe MariaDB |
+| `DB_NAME` | `tp2_maintenance_z4` | Nom de la base de données |
+| `MODBUS_IP` | `172.16.1.24` | IP de l'automate M580 |
+| `MODBUS_PORT` | `502` | Port Modbus TCP |
+| `REGISTRE_TEMPERATURE` | `706` | Registre holding %MF706 |
+| `REGISTRE_CYCLE_AUTO` | `704` | Registre holding %MW704 |
+| `FREQUENCE_LECTURE` | `3` | Fréquence de lecture en secondes |

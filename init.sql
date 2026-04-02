@@ -1,13 +1,17 @@
 -- =============================================================================
 -- init.sql - Initialisation de la base de données TP2 Maintenance Connectée
 -- Groupe : MORON Axel & RAHARINJATOVO Lucien (Z4)
--- Description : Création des tables au premier démarrage du conteneur MariaDB
---               Exécuté automatiquement via /docker-entrypoint-initdb.d/
+-- Exécuté automatiquement par MariaDB via /docker-entrypoint-initdb.d/
 --
--- Schéma :
---   mesures   → 1 ligne par cycle de lecture (température + état TOR cycle auto)
---   seuils    → historique de chaque modification des seuils (traçabilité)
---   alarmes   → historique des déclenchements et disparitions d'alarmes
+-- Schéma relationnel :
+--
+--   CAPTEURS ←── MESURES    (1 capteur → N mesures)
+--   CAPTEURS ←── SEUIL      (1 capteur → N seuils historiques)
+--   ALARMES                  (table indépendante, pas de FK capteur)
+--
+-- Capteurs fixes (seedés) :
+--   id=1 : Température Zone 3  (float °C — %MF706)
+--   id=2 : Cycle Auto Zone 3   (TOR 0/1  — %MW704)
 -- =============================================================================
 
 CREATE DATABASE IF NOT EXISTS tp2_maintenance_z4
@@ -17,69 +21,85 @@ CREATE DATABASE IF NOT EXISTS tp2_maintenance_z4
 USE tp2_maintenance_z4;
 
 -- -----------------------------------------------------------------------------
--- Table : mesures
---
--- 1 ligne = 1 cycle de lecture Modbus complet
---   temperature  : valeur °C du capteur Banner (float 32 bits %MF706)
---   cycle_auto   : état TOR du cycle automatique Zone 3 (%MW704) — 1=LANCÉ, 0=ARRÊTÉ
---   timestamp    : horodatage de la lecture
---
--- NULL autorisé sur temperature et cycle_auto en cas d'erreur de communication
+-- Table : capteurs
+-- Table de référence des capteurs/grandeurs du système.
+-- Sert de clé étrangère pour MESURES et SEUIL.
 -- -----------------------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS mesures (
-    id          INT           NOT NULL AUTO_INCREMENT,
-    temperature FLOAT         NULL     COMMENT 'Température °C — capteur Banner via %MF706',
-    cycle_auto  TINYINT(1)    NULL     COMMENT 'TOR cycle auto Zone 3 : 1=LANCÉ, 0=ARRÊTÉ (%MW704)',
-    timestamp   DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT 'Horodatage de la lecture Modbus',
+CREATE TABLE IF NOT EXISTS capteurs (
+    id          INT          NOT NULL AUTO_INCREMENT,
+    designation VARCHAR(100) NOT NULL COMMENT 'Nom du capteur ou de la grandeur mesurée',
     PRIMARY KEY (id),
-    INDEX idx_timestamp (timestamp),
-    INDEX idx_temperature (temperature)
+    UNIQUE KEY uk_designation (designation)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
-  COMMENT='Mesures Modbus : 1 ligne par cycle de lecture (température + état cycle auto)';
+  COMMENT='Référentiel des capteurs de l''installation Zone 3';
 
 -- -----------------------------------------------------------------------------
--- Table : seuils
---
--- Historisation de chaque modification des 4 seuils de température.
--- Utilisée pour la traçabilité et le rechargement des seuils au démarrage.
--- Les 4 seuils respectent toujours : tres_bas < bas < haut < tres_haut
+-- Table : mesures
+-- Stockage de toutes les valeurs mesurées, une ligne par lecture et par capteur.
+--   id_capteur=1 → température (°C, float)
+--   id_capteur=2 → cycle auto  (TOR : 1=LANCÉ, 0=ARRÊTÉ)
 -- -----------------------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS seuils (
-    id        INT      NOT NULL AUTO_INCREMENT,
-    tres_haut FLOAT    NOT NULL COMMENT 'Seuil critique supérieur (°C) — alarme niveau 4',
-    haut      FLOAT    NOT NULL COMMENT 'Seuil d'attention supérieur (°C) — alarme niveau 3',
-    bas       FLOAT    NOT NULL COMMENT 'Seuil d'attention inférieur (°C) — alarme niveau 2',
-    tres_bas  FLOAT    NOT NULL COMMENT 'Seuil critique inférieur (°C) — alarme niveau 1',
-    timestamp DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT 'Date et heure de la modification',
+CREATE TABLE IF NOT EXISTS mesures (
+    id          INT      NOT NULL AUTO_INCREMENT,
+    valeur      FLOAT    NOT NULL COMMENT 'Valeur mesurée (°C pour température, 0/1 pour TOR)',
+    id_capteur  INT      NOT NULL COMMENT 'Capteur source (FK → capteurs.id)',
+    temps       DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT 'Horodatage de la lecture',
     PRIMARY KEY (id),
-    INDEX idx_timestamp (timestamp)
+    INDEX idx_capteur_temps (id_capteur, temps),
+    CONSTRAINT fk_mesures_capteur FOREIGN KEY (id_capteur) REFERENCES capteurs(id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
-  COMMENT='Historique des modifications des seuils de température';
+  COMMENT='Mesures Modbus horodatées, une ligne par capteur par cycle de lecture';
+
+-- -----------------------------------------------------------------------------
+-- Table : seuil
+-- Historique des modifications des seuils de température (traçabilité).
+-- Les 4 niveaux : tres_haut (Max critique) > haut > bas > tres_bas (Min critique)
+-- Lié au capteur température (id_capteur=1).
+-- -----------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS seuil (
+    id          INT      NOT NULL AUTO_INCREMENT,
+    tres_haut   FLOAT    NOT NULL COMMENT 'Max critique (°C) — alarme rouge',
+    haut        FLOAT    NOT NULL COMMENT 'Max attention (°C) — alarme orange',
+    bas         FLOAT    NOT NULL COMMENT 'Min attention (°C) — alarme vert',
+    tres_bas    FLOAT    NOT NULL COMMENT 'Min critique (°C) — alarme rouge',
+    id_capteur  INT      NOT NULL DEFAULT 1 COMMENT 'Capteur concerné (FK → capteurs.id)',
+    temps       DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT 'Date de modification',
+    PRIMARY KEY (id),
+    INDEX idx_capteur_temps (id_capteur, temps),
+    CONSTRAINT fk_seuil_capteur FOREIGN KEY (id_capteur) REFERENCES capteurs(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+  COMMENT='Historique des modifications des seuils de température (traçabilité)';
 
 -- -----------------------------------------------------------------------------
 -- Table : alarmes
---
--- Historisation de tous les événements d'alarme (déclenchements et disparitions).
--- type_evenement : 'declenchement' = seuil franchi, 'disparition' = retour normal
+-- Historique de tous les événements d'alarme (déclenchements et disparitions).
+-- type_evenement : 'declenchement' | 'disparition'
 -- niveau         : tres_haut | haut | normal | bas | tres_bas | info
 -- -----------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS alarmes (
     id             INT          NOT NULL AUTO_INCREMENT,
     type_evenement VARCHAR(20)  NOT NULL COMMENT '''declenchement'' ou ''disparition''',
     niveau         VARCHAR(20)  NOT NULL COMMENT 'tres_haut | haut | normal | bas | tres_bas | info',
-    message        VARCHAR(255) NOT NULL COMMENT 'Message affiché à l''opérateur',
+    message        VARCHAR(255) NOT NULL COMMENT 'Message opérateur',
     temperature    FLOAT        NULL     COMMENT 'Température au moment de l''événement (°C)',
-    timestamp      DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT 'Horodatage de l''événement',
+    timestamp      DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT 'Horodatage',
     PRIMARY KEY (id),
-    INDEX idx_timestamp (timestamp),
-    INDEX idx_niveau (niveau),
-    INDEX idx_type_evenement (type_evenement)
+    INDEX idx_timestamp    (timestamp),
+    INDEX idx_niveau       (niveau),
+    INDEX idx_type_evnmt   (type_evenement)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
-  COMMENT='Historique des événements d''alarme (déclenchements et disparitions)';
+  COMMENT='Journal des événements d''alarme (déclenchements et disparitions)';
 
 -- -----------------------------------------------------------------------------
--- Seuils par défaut — insérés uniquement si la table est vide (premier démarrage)
+-- Seed : capteurs par défaut
 -- -----------------------------------------------------------------------------
-INSERT INTO seuils (tres_haut, haut, bas, tres_bas)
-SELECT 40, 35, 18, 10
-WHERE NOT EXISTS (SELECT 1 FROM seuils LIMIT 1);
+INSERT IGNORE INTO capteurs (id, designation) VALUES
+    (1, 'Température Zone 3'),
+    (2, 'Cycle Auto Zone 3');
+
+-- -----------------------------------------------------------------------------
+-- Seed : seuils par défaut (uniquement si la table est vide)
+-- -----------------------------------------------------------------------------
+INSERT INTO seuil (tres_haut, haut, bas, tres_bas, id_capteur)
+SELECT 40, 35, 18, 10, 1
+WHERE NOT EXISTS (SELECT 1 FROM seuil LIMIT 1);
