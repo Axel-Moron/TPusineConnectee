@@ -39,9 +39,62 @@ Ce projet met en œuvre une application de supervision temps réel liée à un c
 
 5. **Maintenance Prédictive** :
    - Estimation du temps avant franchissement d'un seuil critique ou de sortie d'alarme.
-   - **Méthode** : Régression linéaire (moindres carrés) calculée sur l'historique récent (10 dernières mesures). L'algorithme calcule la pente pondérée par le temps (dérivée en °C/sec). Le temps estimé est ensuite obtenu en divisant l'écart avec le seuil par cette pente (T = Δ°C / Pente).
-   - Alerte active si le seuil est déjà dépassé (message + indicateur visuel).
-   - Actif uniquement si le cycle automatique de la ligne est lancé.
+   - **Méthode** : Régression linéaire (moindres carrés) calculée sur l'historique récent.
+   - Voir la section détaillée [Méthode de maintenance prédictive](#-méthode-de-maintenance-prédictive--régression-linéaire) ci-dessous.
+
+---
+
+## 📈 Méthode de maintenance prédictive — Régression linéaire
+
+Le service `predictiveService.js` utilise la méthode des moindres carrés (régression linéaire simple) pour estimer l'évolution future de la température.
+
+### 1. Collecte des données
+À chaque cycle de lecture (toutes les 3 secondes par défaut), la mesure est ajoutée à un buffer circulaire des 10 dernières valeurs :
+`[ (t₀, T₀), (t₁, T₁), ..., (t₉, T₉) ]`
+*(temps en secondes, température en °C)*
+
+### 2. Calcul de la pente (dérivée)
+Sur ces N points, on calcule la droite de régression `T = a·t + b` où `a` est la pente (°C/seconde).
+La formule des moindres carrés :
+```text
+        N·Σ(tᵢ·Tᵢ) − Σtᵢ · ΣTᵢ
+a = ─────────────────────────────────
+         N·Σ(tᵢ²) − (Σtᵢ)²
+```
+Les temps sont normalisés (relatifs au premier point du buffer) pour éviter les grands nombres flottants.
+La pente `a` est exprimée en °C/seconde, affichée en °C/min dans l'interface.
+
+### 3. Estimation du temps avant franchissement
+Une fois la pente connue, on calcule le temps restant avant d'atteindre un seuil avec une simple règle de trois :
+```text
+           seuil_cible − T_actuelle
+t_restant = ─────────────────────────
+                      a
+```
+**Exemple** : température à 28°C, pente = +0.05°C/s, seuil très haut = 30°C
+→ `t = (30−28) / 0.05 = 40 secondes`
+
+### 4. Logique de décision (zones)
+
+| Zone | Condition | Pente | Message affiché |
+| :--- | :--- | :---: | :--- |
+| Déjà au-dessus de TH | `T > tres_haut` | + | ⚠️ Seuil très haut dépassé — en hausse |
+| Déjà au-dessus de TH | `T > tres_haut` | - | Retour sous TH dans `X` sec |
+| Entre H et TH | `haut < T ≤ tres_haut` | + | Risque d'atteinte TH dans `X` sec |
+| Entre H et TH | `haut < T ≤ tres_haut` | - | Sortie du seuil haut dans `X` sec |
+| Entre TB et B | `tres_bas ≤ T < bas` | - | Risque d'atteinte TB dans `X` sec |
+| Déjà en-dessous de TB | `T < tres_bas` | - | ⚠️ Seuil très bas dépassé — en baisse |
+| **Zone normale** | `bas ≤ T ≤ haut` | — | Température stable |
+
+> ℹ️ La prédiction n'est active que si le **cycle auto est lancé** (inutile de prédire si la machine est arrêtée).
+
+### Limites de la méthode
+- Fiable sur des tendances courtes et linéaires (montée en température progressive).
+- Moins précise si la température oscille ou change brutalement de direction.
+- Nécessite au minimum 3 points avant de produire un résultat (les premières secondes affichent "Calcul en cours...").
+- Une pente inférieure à 0.001°C/s est considérée comme nulle (température stable) pour éviter les faux positifs.
+
+---
 
 6. **Connexion Power BI** :
    - Connecteur MySQL sur `localhost:6778`, base `tp2_maintenance_z4`.
