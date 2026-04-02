@@ -27,6 +27,7 @@ import Capteur from "./models/Capteur.js";
 import Mesure from "./models/Mesure.js";
 import Seuil from "./models/Seuil.js";
 import Alarme from "./models/Alarme.js";
+import Config from "./models/Config.js";
 
 // Import des routes API
 import apiRoutes from "./routes/api.js";
@@ -101,7 +102,21 @@ const startServer = async () => {
 
     // 2. Synchronisation des modèles Sequelize (crée/met à jour les tables)
     await sequelize.sync();
-    console.log("✅ Tables BDD synchronisées (capteurs, mesures, seuil, alarmes)");
+    console.log("✅ Tables BDD synchronisées (capteurs, mesures, seuil, alarmes, configs)");
+
+    // 2.5 Chargement de la configuration technique Modbus
+    const [config] = await Config.findOrCreate({ 
+        where: { id: 1 }, 
+        defaults: {} // utilises les valeurs par défaut du modèle
+    });
+    
+    // Injecter dans les services
+    const { setModbusConfig } = await import("./services/modbusService.js");
+    const { setFrequence } = await import("./services/scheduler.js");
+    
+    setModbusConfig(config.dataValues);
+    setFrequence(config.frequenceLecture);
+    console.log("✅ Configuration Modbus chargée depuis la BDD");
 
     // 3. Insertion des capteurs par défaut si absents (seed)
     await Capteur.findOrCreate({ where: { id: 1 }, defaults: { designation: 'Température Zone 3' } });

@@ -326,7 +326,7 @@
                 <span class="param-arch-icon">&#9432;</span>
                 <span>
                     <strong>Architecture :</strong> Le PC lit les données depuis l'automate API M580
-                    (<code>172.16.1.24</code>) via <strong>Modbus TCP</strong>. L'automate récupère la
+                    (<code id="ip-architecture">172.16.1.24</code>) via <strong>Modbus TCP</strong>. L'automate récupère la
                     température depuis la passerelle Banner via son service Modbus DTM.
                     Le PC doit être connecté au <strong>wifi API</strong>.
                 </span>
@@ -352,7 +352,7 @@
                                 IP Automate
                                 <span class="param-hint">API M580</span>
                             </label>
-                            <input type="text" id="cfg-modbus-ip" value="172.16.1.24" placeholder="172.16.1.24">
+                            <input type="text" id="cfg-modbus-ip" placeholder="172.16.1.24">
                         </div>
 
                         <div class="setting-row">
@@ -360,7 +360,7 @@
                                 Port TCP
                                 <span class="param-hint">Standard Modbus : 502</span>
                             </label>
-                            <input type="number" id="cfg-modbus-port" value="502" placeholder="502">
+                            <input type="number" id="cfg-modbus-port" placeholder="502">
                         </div>
 
                         <div class="param-btn-row">
@@ -378,15 +378,15 @@
                                 Température
                                 <span class="param-hint">%MF706 — float 32 bits FC03</span>
                             </label>
-                            <input type="number" id="cfg-reg-temp" value="706" placeholder="706">
+                            <input type="number" id="cfg-reg-temp" placeholder="706">
                         </div>
 
                         <div class="setting-row">
                             <label for="cfg-reg-cycle">
                                 Cycle Auto Zone 3
-                                <span class="param-hint">%MW704 — holding FC03, ≠0 = LANCÉ</span>
+                                <span class="param-hint">%M704 — coil FC01, true = LANCÉ</span>
                             </label>
-                            <input type="number" id="cfg-reg-cycle" value="704" placeholder="704">
+                            <input type="number" id="cfg-reg-cycle" placeholder="704">
                         </div>
 
                         <div class="setting-row">
@@ -417,7 +417,7 @@
                             <p>Recopie des voyants vers l'armoire API (écriture coils FC05)</p>
                         </div>
                         <label class="switch switch-sm" style="margin-left:auto;">
-                            <input type="checkbox" id="cfg-colonne-enabled" checked onchange="toggleColonneConfig()">
+                            <input type="checkbox" id="cfg-colonne-enabled" title="Activer colonne lumineuse" checked onchange="toggleColonneConfig()">
                             <span class="slider"></span>
                         </label>
                     </div>
@@ -427,17 +427,17 @@
                             <div class="param-voyant-row rouge">
                                 <span class="param-voyant-dot"></span>
                                 <label for="cfg-coil-rouge">Rouge (%M)</label>
-                                <input type="number" id="cfg-coil-rouge" value="702" placeholder="702">
+                                <input type="number" id="cfg-coil-rouge" placeholder="702">
                             </div>
                             <div class="param-voyant-row orange">
                                 <span class="param-voyant-dot"></span>
                                 <label for="cfg-coil-orange">Orange (%M)</label>
-                                <input type="number" id="cfg-coil-orange" value="701" placeholder="701">
+                                <input type="number" id="cfg-coil-orange" placeholder="701">
                             </div>
                             <div class="param-voyant-row vert">
                                 <span class="param-voyant-dot"></span>
                                 <label for="cfg-coil-vert">Vert (%M)</label>
-                                <input type="number" id="cfg-coil-vert" value="703" placeholder="703">
+                                <input type="number" id="cfg-coil-vert" placeholder="703">
                             </div>
                         </div>
                         <div class="param-note">Actif uniquement en <strong>mode réel</strong> — désactivé en simulation.</div>
@@ -458,7 +458,7 @@
                             <p>Signal de présence vers l'automate (bascule 0/1)</p>
                         </div>
                         <label class="switch switch-sm" style="margin-left:auto;">
-                            <input type="checkbox" id="cfg-heartbeat-enabled" checked onchange="toggleHeartbeatConfig()">
+                            <input type="checkbox" id="cfg-heartbeat-enabled" title="Activer heartbeat" checked onchange="toggleHeartbeatConfig()">
                             <span class="slider"></span>
                         </label>
                     </div>
@@ -469,7 +469,7 @@
                                 Coil heartbeat
                                 <span class="param-hint">%M700 par défaut</span>
                             </label>
-                            <input type="number" id="cfg-reg-heartbeat" value="700" placeholder="700">
+                            <input type="number" id="cfg-reg-heartbeat" placeholder="700">
                         </div>
 
                         <div class="setting-row">
@@ -477,7 +477,7 @@
                                 Période
                                 <span class="param-hint">Millisecondes (100 – 10 000)</span>
                             </label>
-                            <input type="number" id="cfg-heartbeat-freq" value="1000" min="100" max="10000" placeholder="1000">
+                            <input type="number" id="cfg-heartbeat-freq" min="100" max="10000" placeholder="1000">
                         </div>
 
                         <div class="param-note">L'automate détecte une absence de supervision si le heartbeat s'arrête.</div>
@@ -503,6 +503,7 @@
         let chartHistorique = null;        // Instance Chart.js pour l'historique
         let currentRange = 5;              // Plage par défaut : 5 minutes
         let intervalRefresh = null;        // Intervalle de rafraîchissement
+        let currentPrediction = null;      // Prédiction courante pour le graphique
 
         // =====================================================================
         // Horloge temps réel (mise à jour chaque seconde)
@@ -685,6 +686,7 @@
 
                 // --- Indicateurs prédictifs ---
                 if (data.prediction) {
+                    currentPrediction = data.prediction;
                     mettreAJourPrediction(data.prediction);
                 }
 
@@ -859,10 +861,24 @@
             const ctx = document.getElementById('chartTemperature').getContext('2d');
 
             if (chartTemperature) chartTemperature.destroy();
-            if (data.length === 0) return;
 
-            const labels = data.map(d => new Date(d.timestamp));
-            const values = data.map(d => d.valeur);
+            // S'il n'y a pas de données, on va juste laisser le graphique vide avec l'axe du temps actuel
+            let labels = [];
+            let values = [];
+            let currentTemp = 0;
+            let lastTime = new Date();
+            
+            if (data && data.length > 0) {
+                labels = data.map(d => new Date(d.timestamp));
+                values = data.map(d => d.temperature);
+                currentTemp = values[values.length - 1];
+                lastTime = labels[labels.length - 1];
+            } else {
+                // Créer un axe du temps artificiel pour montrer que le graphique est actif mais vide
+                const now = new Date();
+                labels = [new Date(now.getTime() - currentRange * 60000), now];
+                values = [null, null];
+            }
 
             // Datasets : courbe principale + lignes de seuils
             const datasets = [
@@ -879,7 +895,7 @@
                 },
                 {
                     label: 'Seuil Très Haut',
-                    data: new Array(data.length).fill(seuils.tres_haut),
+                    data: new Array(labels.length).fill(seuils.tres_haut),
                     borderColor: '#ff0000',
                     borderWidth: 2,
                     borderDash: [8, 4],
@@ -888,7 +904,7 @@
                 },
                 {
                     label: 'Seuil Haut',
-                    data: new Array(data.length).fill(seuils.haut),
+                    data: new Array(labels.length).fill(seuils.haut),
                     borderColor: '#ff6b6b',
                     borderWidth: 1.5,
                     borderDash: [5, 5],
@@ -897,7 +913,7 @@
                 },
                 {
                     label: 'Seuil Bas',
-                    data: new Array(data.length).fill(seuils.bas),
+                    data: new Array(labels.length).fill(seuils.bas),
                     borderColor: '#51cf66',
                     borderWidth: 1.5,
                     borderDash: [5, 5],
@@ -906,7 +922,7 @@
                 },
                 {
                     label: 'Seuil Très Bas',
-                    data: new Array(data.length).fill(seuils.tres_bas),
+                    data: new Array(labels.length).fill(seuils.tres_bas),
                     borderColor: '#0000ff',
                     borderWidth: 2,
                     borderDash: [8, 4],
@@ -914,6 +930,37 @@
                     fill: false
                 }
             ];
+
+            // --- Ajout de la droite de prédiction ---
+            if (currentPrediction && currentPrediction.tempsEstime && currentPrediction.pente && data && data.length > 0) {
+                // On crée 2 points : le point actuel, et le point dans le futur
+                const futureTime = new Date(lastTime.getTime() + currentPrediction.tempsEstime * 1000);
+                const futureTemp = currentTemp + currentPrediction.pente * currentPrediction.tempsEstime;
+                
+                // Uniquement deux points dans ce dataset pour faire un segment de droite
+                datasets.push({
+                    label: 'Prédiction',
+                    data: labels.map((l, i) => i === labels.length - 1 ? currentTemp : null),
+                    borderColor: '#ffdd57', // Jaune bien visible
+                    borderWidth: 3,
+                    borderDash: [10, 5],
+                    pointRadius: 4,
+                    pointBackgroundColor: '#ffdd57',
+                    fill: false
+                });
+                
+                // Ajouter le point futur (ceci allonge l'axe X)
+                labels.push(futureTime);
+                datasets.forEach((ds, i) => {
+                    if (ds.label === 'Prédiction') {
+                        ds.data.push(futureTemp);
+                    } else if (ds.label.startsWith('Seuil')) {
+                        ds.data.push(ds.data[0]); // Prolonger la ligne des seuils
+                    } else {
+                        ds.data.push(null); // Ne pas prolonger la courbe de temp actuelle
+                    }
+                });
+            }
 
             chartTemperature = new Chart(ctx, {
                 type: 'line',
@@ -941,7 +988,7 @@
                         },
                         tooltip: {
                             callbacks: {
-                                label: ctx => ctx.dataset.label + ': ' + ctx.parsed.y.toFixed(1) + '°C'
+                                label: ctx => ctx.dataset.label + ': ' + (ctx.parsed.y !== null ? ctx.parsed.y.toFixed(1) + '°C' : 'N/A')
                             }
                         }
                     }
@@ -975,11 +1022,11 @@
                     data: {
                         labels: mesures.map(d => new Date(d.timestamp)),
                         datasets: [
-                            { label: 'Température', data: mesures.map(d => d.valeur), borderColor: '#339af0', backgroundColor: 'rgba(51,154,240,0.1)', borderWidth: 2, pointRadius: 0, fill: true, tension: 0.3 },
-                            { label: 'TH', data: new Array(mesures.length).fill(seuils.tres_haut), borderColor: '#ff0000', borderWidth: 1.5, borderDash: [5,5], pointRadius: 0, fill: false },
-                            { label: 'H', data: new Array(mesures.length).fill(seuils.haut), borderColor: '#ff6b6b', borderWidth: 1, borderDash: [3,3], pointRadius: 0, fill: false },
-                            { label: 'B', data: new Array(mesures.length).fill(seuils.bas), borderColor: '#51cf66', borderWidth: 1, borderDash: [3,3], pointRadius: 0, fill: false },
-                            { label: 'TB', data: new Array(mesures.length).fill(seuils.tres_bas), borderColor: '#0000ff', borderWidth: 1.5, borderDash: [5,5], pointRadius: 0, fill: false }
+                            { label: 'Température', data: mesures.map(d => d.temperature), borderColor: '#339af0', backgroundColor: 'rgba(51,154,240,0.1)', borderWidth: 2, pointRadius: 0, fill: true, tension: 0.3 },
+                            { label: 'Seuil Très Haut', data: new Array(mesures.length).fill(seuils.tres_haut), borderColor: '#ff0000', borderWidth: 1.5, borderDash: [5,5], pointRadius: 0, fill: false },
+                            { label: 'Seuil Haut', data: new Array(mesures.length).fill(seuils.haut), borderColor: '#ff6b6b', borderWidth: 1, borderDash: [3,3], pointRadius: 0, fill: false },
+                            { label: 'Seuil Bas', data: new Array(mesures.length).fill(seuils.bas), borderColor: '#51cf66', borderWidth: 1, borderDash: [3,3], pointRadius: 0, fill: false },
+                            { label: 'Seuil Très Bas', data: new Array(mesures.length).fill(seuils.tres_bas), borderColor: '#0000ff', borderWidth: 1.5, borderDash: [5,5], pointRadius: 0, fill: false }
                         ]
                     },
                     options: {
@@ -1108,6 +1155,10 @@
             try {
                 const res = await fetch(`${API_URL}/config`);
                 const cfg = await res.json();
+                
+                // Maj affichage Architecture
+                if (cfg.modbusIp) document.getElementById('ip-architecture').textContent = cfg.modbusIp;
+
                 if (cfg.modbusIp) document.getElementById('cfg-modbus-ip').value = cfg.modbusIp;
                 if (cfg.modbusPort) document.getElementById('cfg-modbus-port').value = cfg.modbusPort;
                 if (cfg.registreTemperature) document.getElementById('cfg-reg-temp').value = cfg.registreTemperature;

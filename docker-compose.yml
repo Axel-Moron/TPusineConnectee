@@ -35,7 +35,7 @@ services:
       db:
         condition: service_healthy    # Attend que MariaDB soit prêt avant de démarrer
     ports:
-      - "6777:3000"            # Port d'accès à l'application web
+      - "6777:6777"            # Port d'accès à l'application web
     env_file: .env
     environment:
       - DB_HOST=db             # Utilise le service 'db' interne au réseau Docker

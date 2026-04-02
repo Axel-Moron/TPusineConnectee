@@ -18,6 +18,7 @@ import Capteur from "../models/Capteur.js";
 import Mesure from "../models/Mesure.js";
 import Seuil from "../models/Seuil.js";
 import Alarme from "../models/Alarme.js";
+import Config from "../models/Config.js";
 import { appendSeuilCSV, appendAlarmeCSV } from "../services/csvService.js";
 import { setSimulationMode, getSimulationMode, getModbusConfig, setModbusConfig } from "../services/modbusService.js";
 import {
@@ -293,7 +294,7 @@ router.get("/config", (req, res) => {
 //   { modbusIp, modbusPort, registreTemperature,
 //     registreCycleAuto, frequenceLecture, heartbeatEnabled, registreHeartbeat, heartbeatFreq }
 // =============================================================================
-router.post("/config", (req, res) => {
+router.post("/config", async (req, res) => {
     try {
         const {
             modbusIp, modbusPort,
@@ -302,7 +303,7 @@ router.post("/config", (req, res) => {
             heartbeatEnabled, registreHeartbeat, heartbeatFreq
         } = req.body;
 
-        // Mise à jour de la config Modbus
+        // Mise à jour de la config Modbus globale
         setModbusConfig({
             modbusIp, modbusPort,
             registreTemperature, registreCycleAuto,
@@ -314,7 +315,24 @@ router.post("/config", (req, res) => {
             setFrequence(frequenceLecture);
         }
 
-        console.log(`⚙️ Configuration mise à jour via API`);
+        // Sauvegarde persistante en BDD
+        await Config.upsert({
+            id: 1,
+            modbusIp: modbusIp !== undefined ? modbusIp : getModbusConfig().modbusIp,
+            modbusPort: modbusPort !== undefined ? modbusPort : getModbusConfig().modbusPort,
+            registreTemperature: registreTemperature !== undefined ? registreTemperature : getModbusConfig().registreTemperature,
+            registreCycleAuto: registreCycleAuto !== undefined ? registreCycleAuto : getModbusConfig().registreCycleAuto,
+            frequenceLecture: frequenceLecture !== undefined ? frequenceLecture : getFrequence(),
+            colonneEnabled: getModbusConfig().colonneEnabled,
+            coilRouge: getModbusConfig().coilRouge,
+            coilOrange: getModbusConfig().coilOrange,
+            coilVert: getModbusConfig().coilVert,
+            heartbeatEnabled: heartbeatEnabled !== undefined ? heartbeatEnabled : getModbusConfig().heartbeatEnabled,
+            registreHeartbeat: registreHeartbeat !== undefined ? registreHeartbeat : getModbusConfig().registreHeartbeat,
+            heartbeatFreq: heartbeatFreq !== undefined ? heartbeatFreq : getModbusConfig().heartbeatFreq
+        });
+
+        console.log(`⚙️ Configuration mise à jour via API et BDD`);
         res.json({
             success: true,
             config: {

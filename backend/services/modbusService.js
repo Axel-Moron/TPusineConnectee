@@ -16,7 +16,7 @@ import ModbusRTU from "modbus-serial";
 let MODBUS_IP = process.env.MODBUS_IP || "172.16.1.24";
 let MODBUS_PORT = parseInt(process.env.MODBUS_PORT) || 502;
 let REG_TEMPERATURE = parseInt(process.env.REGISTRE_TEMPERATURE) || 706;
-let REG_CYCLE_AUTO = parseInt(process.env.REGISTRE_CYCLE_AUTO) || 640;
+let REG_CYCLE_AUTO = parseInt(process.env.REGISTRE_CYCLE_AUTO) || 704;
 
 // --- Configuration colonne lumineuse (écriture coils vers l'automate) ---
 let COLONNE_ENABLED = true;
@@ -148,7 +148,7 @@ export const readTemperature = async () => {
 
 /**
  * Lecture de l'état du cycle automatique Zone 3 via Modbus TCP
- * Lit le registre holding %MW704 (FC03) — info TOR : 0=ARRÊTÉ, non-zéro=LANCÉ
+ * Lit le bit %M640 (FC01 readCoils) — info TOR : 0=ARRÊTÉ, 1=LANCÉ
  */
 export const readCycleAuto = async () => {
     if (MODE_SIMULATION) return true;
@@ -159,11 +159,11 @@ export const readCycleAuto = async () => {
         client.setID(1);
         client.setTimeout(3000);
 
-        // Lecture du registre holding %MW704 (FC03) — info TOR cycle auto Zone 3
-        const data = await client.readHoldingRegisters(REG_CYCLE_AUTO, 1);
-        const cycleActif = data.data[0] !== 0;  // 0 = ARRÊTÉ, toute valeur non nulle = LANCÉ
+        // Lecture du bit %M640 (FC01 readCoils) — info TOR cycle auto Zone 3
+        const data = await client.readCoils(REG_CYCLE_AUTO, 1);
+        const cycleActif = data.data[0] === true;  // true = LANCÉ, false = ARRÊTÉ
 
-        console.log(`✅ Cycle auto Zone 3 : ${cycleActif ? "LANCÉ" : "ARRÊTÉ"} (registre %MW${REG_CYCLE_AUTO} = ${data.data[0]})`);
+        console.log(`✅ Cycle auto Zone 3 : ${cycleActif ? "LANCÉ" : "ARRÊTÉ"} (bit %M${REG_CYCLE_AUTO} = ${data.data[0]})`);
         return cycleActif;
 
     } catch (error) {
